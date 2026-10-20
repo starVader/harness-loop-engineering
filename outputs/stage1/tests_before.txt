@@ -1,0 +1,102 @@
+......F..F..FF                                                           [100%]
+=================================== FAILURES ===================================
+___________________ test_cart_exactly_at_min_spend_qualifies ___________________
+
+    def test_cart_exactly_at_min_spend_qualifies():
+>       totals = compute_total(make_order(make_cart("500"), codes=("DIWALI10",)))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_discounts.py:34: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+checkout/checkout.py:44: in compute_total
+    code = validate_code(order.codes[0], subtotal, _order_date(order), catalog)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+raw_code = 'DIWALI10', subtotal = Decimal('500')
+order_date = datetime.date(2026, 10, 30)
+catalog = {'DIWALI10': DiscountCode(code='DIWALI10', percent_off=Decimal('10'), expires_on=datetime.date(2026, 10, 31), min_subt...ountCode(code='WELCOME5', percent_off=Decimal('5'), expires_on=datetime.date(2026, 12, 31), min_subtotal=Decimal('0'))}
+
+    def validate_code(
+        raw_code: str,
+        subtotal: Decimal,
+        order_date: date,
+        catalog: Dict[str, DiscountCode],
+    ) -> DiscountCode:
+        """Return the discount if `raw_code` may be used on this order, else raise DiscountRejected."""
+        code = catalog.get(raw_code.strip().upper())
+        if code is None:
+            raise DiscountRejected("unknown")
+        if order_date > code.expires_on:
+            raise DiscountRejected("expired")
+        if subtotal <= code.min_subtotal:
+>           raise DiscountRejected("below_min_spend")
+E           checkout.discounts.DiscountRejected: below_min_spend
+
+checkout/discounts.py:40: DiscountRejected
+_______________ test_discount_applies_to_cash_on_delivery_order ________________
+
+    def test_discount_applies_to_cash_on_delivery_order():
+        order = make_order(
+            make_cart("1000"),
+            codes=("DIWALI10",),
+            placed_at=datetime(2026, 10, 30, 11, 0, tzinfo=IST),
+            paid_at=datetime(2026, 11, 2, 16, 0, tzinfo=IST),
+        )
+>       assert compute_total(order).discount == Decimal("100.00")
+               ^^^^^^^^^^^^^^^^^^^^
+
+tests/test_discounts.py:60: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+checkout/checkout.py:44: in compute_total
+    code = validate_code(order.codes[0], subtotal, _order_date(order), catalog)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+raw_code = 'DIWALI10', subtotal = Decimal('1000')
+order_date = datetime.date(2026, 11, 2)
+catalog = {'DIWALI10': DiscountCode(code='DIWALI10', percent_off=Decimal('10'), expires_on=datetime.date(2026, 10, 31), min_subt...ountCode(code='WELCOME5', percent_off=Decimal('5'), expires_on=datetime.date(2026, 12, 31), min_subtotal=Decimal('0'))}
+
+    def validate_code(
+        raw_code: str,
+        subtotal: Decimal,
+        order_date: date,
+        catalog: Dict[str, DiscountCode],
+    ) -> DiscountCode:
+        """Return the discount if `raw_code` may be used on this order, else raise DiscountRejected."""
+        code = catalog.get(raw_code.strip().upper())
+        if code is None:
+            raise DiscountRejected("unknown")
+        if order_date > code.expires_on:
+>           raise DiscountRejected("expired")
+E           checkout.discounts.DiscountRejected: expired
+
+checkout/discounts.py:38: DiscountRejected
+__________________________ test_half_paisa_rounds_up ___________________________
+
+    def test_half_paisa_rounds_up():
+        # 12.75 * 1.18 = 15.045 -> customer pays 15.05, never 15.04
+        totals = compute_total(make_order(make_cart("12.75")))
+>       assert totals.total == Decimal("15.05")
+E       AssertionError: assert Decimal('15.04') == Decimal('15.05')
+E        +  where Decimal('15.04') = Totals(subtotal=Decimal('12.75'), discount=Decimal('0.00'), tax=Decimal('2.30'), total=Decimal('15.04')).total
+E        +  and   Decimal('15.05') = Decimal('15.05')
+
+tests/test_totals.py:17: AssertionError
+_________________ test_gst_is_charged_on_the_discounted_amount _________________
+
+    def test_gst_is_charged_on_the_discounted_amount():
+        totals = compute_total(make_order(make_cart("1000"), codes=("DIWALI10",)))
+        assert totals.discount == Decimal("100.00")
+>       assert totals.tax == Decimal("162.00")
+E       AssertionError: assert Decimal('180.00') == Decimal('162.00')
+E        +  where Decimal('180.00') = Totals(subtotal=Decimal('1000.00'), discount=Decimal('100.00'), tax=Decimal('180.00'), total=Decimal('1080.00')).tax
+E        +  and   Decimal('162.00') = Decimal('162.00')
+
+tests/test_totals.py:23: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_discounts.py::test_cart_exactly_at_min_spend_qualifies - ch...
+FAILED tests/test_discounts.py::test_discount_applies_to_cash_on_delivery_order
+FAILED tests/test_totals.py::test_half_paisa_rounds_up - AssertionError: asse...
+FAILED tests/test_totals.py::test_gst_is_charged_on_the_discounted_amount - A...
+4 failed, 10 passed in 0.02s

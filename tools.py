@@ -1,5 +1,7 @@
 """The actor's tools, and the guardrails that keep it from rigging the oracle.
 
+The actor sees only checkout/, tests/ and INTENT.md; everything else in the
+repo (venv, the bug patch, outputs, exercises) does not exist for it.
 Writes are allowlisted to checkout/*.py. Tests, INTENT.md, pytest config and
 conftest are out of reach, so the only way to green is changing product code.
 run_tests takes no arguments: the model cannot choose what "passing" means.
@@ -16,7 +18,8 @@ WRITABLE_DIR = REPO_ROOT / "checkout"
 PYTEST_CMD = [sys.executable, "-m", "pytest", "-q", "--tb=short", "-p", "no:cacheprovider", "tests/"]
 PYTEST_TIMEOUT_SECONDS = 60
 OUTPUT_TAIL_LINES = 60
-HIDDEN_PARTS = {".git", ".venv", "__pycache__"}
+VISIBLE_DIRS = ("checkout", "tests")
+VISIBLE_FILES = ("INTENT.md",)
 
 
 @dataclass(frozen=True)
@@ -36,12 +39,23 @@ class PathRefused(Exception):
     pass
 
 
+def _is_visible(resolved: Path) -> bool:
+    if REPO_ROOT not in resolved.parents:
+        return False
+    parts = resolved.relative_to(REPO_ROOT).parts
+    if "__pycache__" in parts:
+        return False
+    if len(parts) == 1:
+        return parts[0] in VISIBLE_FILES
+    return parts[0] in VISIBLE_DIRS
+
+
 def _resolve_inside_repo(relative_path: str) -> Path:
     resolved = (REPO_ROOT / relative_path).resolve()
     if REPO_ROOT not in resolved.parents and resolved != REPO_ROOT:
         raise PathRefused(f"{relative_path} is outside the repository")
-    if HIDDEN_PARTS.intersection(resolved.relative_to(REPO_ROOT).parts):
-        raise PathRefused(f"{relative_path} is not part of the project")
+    if not _is_visible(resolved):
+        raise PathRefused(f"{relative_path} is not part of the project; use list_files to see what is")
     return resolved
 
 
@@ -79,7 +93,7 @@ def _list_files(tool_input: Dict[str, Any]) -> ToolOutcome:
     paths = sorted(
         str(path.relative_to(REPO_ROOT))
         for path in REPO_ROOT.rglob("*")
-        if path.is_file() and not HIDDEN_PARTS.intersection(path.relative_to(REPO_ROOT).parts)
+        if path.is_file() and _is_visible(path.resolve())
     )
     return ToolOutcome("\n".join(paths))
 

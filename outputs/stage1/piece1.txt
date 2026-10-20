@@ -1,0 +1,5 @@
+# Piece 1: one call, no loop (Sonnet 5.5)
+stop_reason: tool_use
+  tool_use  list_files({})  id=toolu_01N199uBLC7r4Td5C4N5gpFC
+  tool_use  run_tests({})  id=toolu_01NNaYQy6sCV2xt5P92ukDo5
+tokens: input=903 output=50

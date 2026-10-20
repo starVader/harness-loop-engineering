@@ -1,0 +1,23 @@
+# Piece 2, first run: before the list_files allowlist fix.
+# list_files returned 3,784 paths (3,734 of them venv/), so call 2's input
+# jumped from 903 to 144,349 tokens. The model could also have read
+# stage0/inject_bugs.patch. Fixed in tools.py by allowlisting what the actor
+# sees: checkout/, tests/, INTENT.md.
+
+--- call 1
+stop_reason: tool_use
+  tool_use  run_tests({})  id=toolu_01RNU5E8PURkLttofnhKW3Mx
+  tool_use  list_files({})  id=toolu_01QS2c5ADvtM2trvgvrfs29a
+tokens: input=903 output=50
+  ran       run_tests -> ok
+  ran       list_files -> ok
+--- call 2
+stop_reason: tool_use
+  tool_use  read_file({'path': 'checkout/checkout.py'})  id=toolu_01K6QVf54MEd4cTohUYFkpKs
+  tool_use  read_file({'path': 'checkout/discounts.py'})  id=toolu_01Vk9VWAhQr46yGAxWoyTaqH
+  tool_use  read_file({'path': 'checkout/tax.py'})  id=toolu_01AthZkwPfZ825K552WZNF8C
+  tool_use  read_file({'path': 'checkout/cart.py'})  id=toolu_0111j5LKKAStwg6W6qNWQCyV
+  tool_use  read_file({'path': 'tests/test_discounts.py'})  id=toolu_01DjpQGzunYPAHxGAyXxykX2
+  tool_use  read_file({'path': 'tests/test_totals.py'})  id=toolu_01HGijv3NEptygwxfYh7hAYs
+  tool_use  read_file({'path': 'tests/conftest.py'})  id=toolu_016uFos2tu6ARXA8RsSGZEj6
+tokens: input=144349 output=365
