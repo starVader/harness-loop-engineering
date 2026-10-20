@@ -13,7 +13,15 @@ python3 -m venv venv && venv/bin/pip install -r requirements.txt
 git add -A && git commit -m "green checkout"
 git apply stage0/inject_bugs.patch && git commit -am "inject 4 bugs" && git tag broken
 ```
-Reset between runs: `git reset --hard broken` (spine files are gitignored, so they survive). Never `git clean`.
+Reset the code between runs: `git restore --source=broken -- checkout/`. This puts only `checkout/` back to the 4 bugs; your `loop.py`, outputs and commits stay. Never `git reset --hard broken` once you have commits after the tag: it moves `main` back and drops them.
+
+## Where things live
+| Folder | What |
+|---|---|
+| `exercises/` | one file per stage: the task, steps, and pass condition. Start at [exercises/README.md](exercises/README.md) |
+| `outputs/` | the evidence from each stage's run, committed. See [outputs/README.md](outputs/README.md) |
+| `assets/` | diagrams |
+| `runs/` | raw output from every run, gitignored |
 
 ## Who writes what
 | File | Author |
@@ -32,7 +40,7 @@ The actor can write only `checkout/*.py`; `run_tests` has a fixed invocation. Us
 4. **Context** — fresh context + spine vs one growing conversation; hand-roll compaction past ~20K tokens; log `usage.input_tokens` per pass.
 5. **Checker** — Haiku reviews `git diff broken` against `INTENT.md`; a fail feeds back into the loop.
 6. **Intent debt** — run without a discount rule in `INTENT.md`, then with one. Watch what the actor does to the expiry check.
-7. **Human gate** — no pass is accepted without your one-sentence explanation in `notes/fixes.md`.
+7. **Human gate** — no pass is accepted without your one-sentence explanation in `outputs/stage7/fixes.md`.
 8. **Triggers** — nightly cron in a *separate clone*; a git post-commit hook.
 
 ## Lab rules

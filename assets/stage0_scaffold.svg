@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="690" viewBox="0 0 960 690" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>Stage 0: the loop engineering lab scaffold</title>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+  </defs>
+  <rect width="960" height="690" fill="#FFFFFF"/>
+  <text x="30" y="44" font-size="22" font-weight="600" fill="#2C2C2A">Stage 0: the lab scaffold</text>
+  <text x="30" y="68" font-size="14" fill="#5F5E5A">What exists before you write any loop code, and how the actor is allowed to touch it.</text>
+
+  <rect x="30" y="170" width="200" height="110" rx="10" fill="#F1EFE8" stroke="#888780" stroke-dasharray="6 4"/>
+  <text x="130" y="203" font-size="16" font-weight="600" fill="#2C2C2A" text-anchor="middle">Actor</text>
+  <text x="130" y="228" font-size="13" fill="#5F5E5A" text-anchor="middle">loop.py (you, stage 1)</text>
+  <text x="130" y="250" font-size="13" fill="#5F5E5A" text-anchor="middle">Claude API calls</text>
+  <line x1="232" y1="225" x2="296" y2="225" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#a)"/>
+  <text x="264" y="214" font-size="12" fill="#5F5E5A" text-anchor="middle">tool calls</text>
+
+  <rect x="300" y="100" width="300" height="250" rx="10" fill="#FAFAF7" stroke="#5F5E5A"/>
+  <text x="450" y="128" font-size="16" font-weight="600" fill="#2C2C2A" text-anchor="middle">tools.py: the only door</text>
+  <g font-size="13">
+    <rect x="315" y="145" width="270" height="40" rx="6" fill="#FFFFFF" stroke="#B4B2A9"/>
+    <text x="327" y="170" font-family="Menlo, monospace" fill="#2C2C2A">list_files</text><text x="573" y="170" fill="#5F5E5A" text-anchor="end">see the project</text>
+    <rect x="315" y="193" width="270" height="40" rx="6" fill="#FFFFFF" stroke="#B4B2A9"/>
+    <text x="327" y="218" font-family="Menlo, monospace" fill="#2C2C2A">read_file</text><text x="573" y="218" fill="#5F5E5A" text-anchor="end">any project file</text>
+    <rect x="315" y="241" width="270" height="40" rx="6" fill="#EAF3DE" stroke="#3B6D11"/>
+    <text x="327" y="266" font-family="Menlo, monospace" fill="#27500A">write_file</text><text x="573" y="266" fill="#27500A" text-anchor="end">only checkout/*.py</text>
+    <rect x="315" y="289" width="270" height="40" rx="6" fill="#E6F1FB" stroke="#185FA5"/>
+    <text x="327" y="314" font-family="Menlo, monospace" fill="#0C447C">run_tests</text><text x="573" y="314" fill="#0C447C" text-anchor="end">fixed pytest command</text>
+  </g>
+  <text x="300" y="376" font-size="12.5" fill="#A32D2D">✗ write_file refuses tests/, INTENT.md, conftest.py, pytest.ini, paths outside the repo</text>
+
+  <rect x="690" y="100" width="240" height="72" rx="10" fill="#EAF3DE" stroke="#3B6D11"/>
+  <text x="706" y="126" font-size="15" font-weight="600" fill="#27500A">checkout/  system under repair</text>
+  <text x="706" y="147" font-size="12.5" fill="#3B6D11">cart · discounts · tax · totals</text>
+  <text x="706" y="164" font-size="12.5" fill="#3B6D11">writable by the actor</text>
+  <rect x="690" y="188" width="240" height="72" rx="10" fill="#E6F1FB" stroke="#185FA5"/>
+  <text x="706" y="214" font-size="15" font-weight="600" fill="#0C447C">tests/  the oracle</text>
+  <text x="706" y="235" font-size="12.5" fill="#185FA5">14 tests · decides "done"</text>
+  <text x="706" y="252" font-size="12.5" fill="#185FA5">read-only</text>
+  <rect x="690" y="276" width="240" height="72" rx="10" fill="#EEEDFE" stroke="#534AB7"/>
+  <text x="706" y="302" font-size="15" font-weight="600" fill="#3C3489">INTENT.md  the why</text>
+  <text x="706" y="323" font-size="12.5" fill="#534AB7">business purpose, no rules yet</text>
+  <text x="706" y="340" font-size="12.5" fill="#534AB7">read-only · you edit at stage 6</text>
+
+  <path d="M587 261 L640 261 L640 136 L686 136" fill="none" stroke="#3B6D11" stroke-width="1.5" marker-end="url(#a)"/>
+  <path d="M587 309 L660 309 L660 224 L686 224" fill="none" stroke="#185FA5" stroke-width="1.5" marker-end="url(#a)"/>
+
+  <line x1="30" y1="405" x2="930" y2="405" stroke="#D3D1C7"/>
+  <text x="30" y="434" font-size="16" font-weight="600" fill="#2C2C2A">Setup: from green to broken</text>
+  <rect x="30" y="450" width="220" height="62" rx="10" fill="#EAF3DE" stroke="#3B6D11"/>
+  <text x="140" y="476" font-size="15" font-weight="600" fill="#27500A" text-anchor="middle">main at green</text>
+  <text x="140" y="498" font-size="12.5" fill="#3B6D11" text-anchor="middle">14 pass · pushed</text>
+  <line x1="252" y1="481" x2="336" y2="481" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="340" y="450" width="280" height="62" rx="10" fill="#F1EFE8" stroke="#5F5E5A"/>
+  <text x="480" y="476" font-size="14" font-weight="600" fill="#2C2C2A" text-anchor="middle" font-family="Menlo, monospace">stage0/inject_bugs.patch</text>
+  <text x="480" y="498" font-size="12.5" fill="#5F5E5A" text-anchor="middle">git apply + commit</text>
+  <line x1="622" y1="481" x2="686" y2="481" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#a)"/>
+  <rect x="690" y="450" width="240" height="62" rx="10" fill="#FCEBEB" stroke="#A32D2D"/>
+  <text x="810" y="476" font-size="15" font-weight="600" fill="#791F1F" text-anchor="middle">tag: broken</text>
+  <text x="810" y="498" font-size="12.5" fill="#A32D2D" text-anchor="middle">4 fail · the reset point</text>
+
+  <text x="30" y="546" font-size="13" fill="#5F5E5A">The 4 bugs the loop must fix (one failing test each):</text>
+  <g font-size="12.5">
+    <rect x="30" y="558" width="210" height="64" rx="8" fill="#FFFFFF" stroke="#B4B2A9"/>
+    <text x="44" y="582" font-weight="600" fill="#2C2C2A">1 · Rounding mode</text><text x="44" y="604" fill="#5F5E5A">15.045 → 15.04, not 15.05</text>
+    <rect x="256" y="558" width="210" height="64" rx="8" fill="#FFFFFF" stroke="#B4B2A9"/>
+    <text x="270" y="582" font-weight="600" fill="#2C2C2A">2 · Min-spend off-by-one</text><text x="270" y="604" fill="#5F5E5A">₹500 cart rejected at ₹500 min</text>
+    <rect x="482" y="558" width="210" height="64" rx="8" fill="#FFFFFF" stroke="#B4B2A9"/>
+    <text x="496" y="582" font-weight="600" fill="#2C2C2A">3 · Tax before discount</text><text x="496" y="604" fill="#5F5E5A">GST on ₹1000, should be ₹900</text>
+    <rect x="708" y="558" width="222" height="64" rx="8" fill="#FAEEDA" stroke="#854F0B"/>
+    <text x="722" y="582" font-weight="600" fill="#633806">4 · COD code "expired"</text><text x="722" y="604" fill="#854F0B">the intent-debt trap</text>
+  </g>
+  <text x="30" y="660" font-size="13" fill="#5F5E5A">Before every loop run:</text>
+  <text x="182" y="660" font-size="13" fill="#2C2C2A" font-family="Menlo, monospace">git restore --source=broken -- checkout/</text>
+</svg>

@@ -220,9 +220,8 @@ __marimo__/
 .streamlit/secrets.toml
 
 # Loop engineering lab
-# Loop state survives `git reset --hard broken` between runs. Never `git clean`.
+# Loop state is never committed. Reset code with `git restore --source=broken -- checkout/`; never `git clean`.
 progress.*
-notes/
 runs/
 .idea/
 .DS_Store

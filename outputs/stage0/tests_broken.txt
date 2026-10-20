@@ -1,0 +1,20 @@
+......F..F..FF                                                           [100%]
+=================================== FAILURES ===================================
+E   checkout.discounts.DiscountRejected: below_min_spend
+/private/tmp/claude-501/-Users-rakesh-dolze-dolze-server/7da4b760-203e-4e8f-861d-7026966e29ed/scratchpad/stage0ev/checkout/discounts.py:40: checkout.discounts.DiscountRejected: below_min_spend
+E   checkout.discounts.DiscountRejected: expired
+/private/tmp/claude-501/-Users-rakesh-dolze-dolze-server/7da4b760-203e-4e8f-861d-7026966e29ed/scratchpad/stage0ev/checkout/discounts.py:38: checkout.discounts.DiscountRejected: expired
+E   AssertionError: assert Decimal('15.04') == Decimal('15.05')
+     +  where Decimal('15.04') = Totals(subtotal=Decimal('12.75'), discount=Decimal('0.00'), tax=Decimal('2.30'), total=Decimal('15.04')).total
+     +  and   Decimal('15.05') = Decimal('15.05')
+/private/tmp/claude-501/-Users-rakesh-dolze-dolze-server/7da4b760-203e-4e8f-861d-7026966e29ed/scratchpad/stage0ev/tests/test_totals.py:17: AssertionError: assert Decimal('15.04') == Decimal('15.05')
+E   AssertionError: assert Decimal('180.00') == Decimal('162.00')
+     +  where Decimal('180.00') = Totals(subtotal=Decimal('1000.00'), discount=Decimal('100.00'), tax=Decimal('180.00'), total=Decimal('1080.00')).tax
+     +  and   Decimal('162.00') = Decimal('162.00')
+/private/tmp/claude-501/-Users-rakesh-dolze-dolze-server/7da4b760-203e-4e8f-861d-7026966e29ed/scratchpad/stage0ev/tests/test_totals.py:23: AssertionError: assert Decimal('180.00') == Decimal('162.00')
+=========================== short test summary info ============================
+FAILED tests/test_discounts.py::test_cart_exactly_at_min_spend_qualifies - ch...
+FAILED tests/test_discounts.py::test_discount_applies_to_cash_on_delivery_order
+FAILED tests/test_totals.py::test_half_paisa_rounds_up - AssertionError: asse...
+FAILED tests/test_totals.py::test_gst_is_charged_on_the_discounted_amount - A...
+4 failed, 10 passed in 0.02s

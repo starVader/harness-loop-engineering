@@ -1,0 +1,11 @@
+Guardrail check: what execute_tool returns for each request (write content not applied for allowed paths).
+
+ALLOWED  write_file(checkout/tax.py)
+REFUSED  write_file(tests/test_cart.py) -> tests/test_cart.py is read-only. You may only write checkout/*.py; tests, INTENT.md and test configuration are fixed.
+REFUSED  write_file(INTENT.md) -> INTENT.md is read-only. You may only write checkout/*.py; tests, INTENT.md and test configuration are fixed.
+REFUSED  write_file(conftest.py) -> conftest.py is read-only. You may only write checkout/*.py; tests, INTENT.md and test configuration are fixed.
+REFUSED  write_file(pytest.ini) -> pytest.ini is read-only. You may only write checkout/*.py; tests, INTENT.md and test configuration are fixed.
+REFUSED  write_file(checkout/../tests/x.py) -> checkout/../tests/x.py is read-only. You may only write checkout/*.py; tests, INTENT.md and test configuration are fixed.
+REFUSED  write_file(../escape.py) -> ../escape.py is outside the repository
+REFUSED  read_file(.git/config) -> .git/config is not part of the project
+REFUSED  no_such_tool() -> unknown tool: no_such_tool
