@@ -27,11 +27,11 @@ class Totals:
 
 
 def round_money(amount: Decimal) -> Decimal:
-    return amount.quantize(PAISE, rounding=ROUND_HALF_UP)
+    return amount.quantize(PAISE)
 
 
 def _order_date(order: Order) -> date:
-    return order.placed_at.date()
+    return (order.paid_at or order.placed_at).date()
 
 
 def compute_total(order: Order, catalog: Dict[str, DiscountCode] = CATALOG) -> Totals:
@@ -45,7 +45,7 @@ def compute_total(order: Order, catalog: Dict[str, DiscountCode] = CATALOG) -> T
         discount = discount_amount(subtotal, code)
 
     taxable = subtotal - discount
-    tax = tax_on(taxable)
+    tax = tax_on(subtotal)
     return Totals(
         subtotal=round_money(subtotal),
         discount=round_money(discount),
