@@ -1,0 +1,38 @@
+diff -ru green/checkout/checkout.py broken/checkout/checkout.py
+--- green/checkout/checkout.py	2026-10-19 17:15:14
++++ broken/checkout/checkout.py	2026-10-19 17:15:14
+@@ -27,11 +27,11 @@
+ 
+ 
+ def round_money(amount: Decimal) -> Decimal:
+-    return amount.quantize(PAISE, rounding=ROUND_HALF_UP)
++    return amount.quantize(PAISE)
+ 
+ 
+ def _order_date(order: Order) -> date:
+-    return order.placed_at.date()
++    return (order.paid_at or order.placed_at).date()
+ 
+ 
+ def compute_total(order: Order, catalog: Dict[str, DiscountCode] = CATALOG) -> Totals:
+@@ -45,7 +45,7 @@
+         discount = discount_amount(subtotal, code)
+ 
+     taxable = subtotal - discount
+-    tax = tax_on(taxable)
++    tax = tax_on(subtotal)
+     return Totals(
+         subtotal=round_money(subtotal),
+         discount=round_money(discount),
+diff -ru green/checkout/discounts.py broken/checkout/discounts.py
+--- green/checkout/discounts.py	2026-10-19 17:15:14
++++ broken/checkout/discounts.py	2026-10-19 17:15:14
+@@ -36,7 +36,7 @@
+         raise DiscountRejected("unknown")
+     if order_date > code.expires_on:
+         raise DiscountRejected("expired")
+-    if subtotal < code.min_subtotal:
++    if subtotal <= code.min_subtotal:
+         raise DiscountRejected("below_min_spend")
+     return code
+ 
