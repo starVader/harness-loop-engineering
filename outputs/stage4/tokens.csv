@@ -1,0 +1,11 @@
+run,compact_at,pass,input_tokens,output_tokens,compacted_after
+A,5000,1,872,50,no
+A,5000,2,2356,363,no
+A,5000,3,5929,1839,no
+B,none,1,872,50,no
+B,none,2,2356,414,no
+B,none,3,6190,1800,no
+C,2000,1,872,50,no
+C,2000,2,2356,414,yes
+C,2000,3,1227,358,no
+C,2000,4,4421,1740,no

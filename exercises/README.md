@@ -17,10 +17,10 @@ One file per stage. Work through them in order; each one builds on the last.
 | 1 | The bare loop: act, observe, adjust | [stage1.md](stage1.md) |
 | 2 | A vague goal vs a goal code can check | [stage2.md](stage2.md) |
 | 3 | The spine: memory across runs | [stage3.md](stage3.md) |
-| 4 | Context: fresh vs growing, compaction | coming |
+| 4 | Context: fresh vs growing, compaction | [stage4.md](stage4.md) |
 | 5 | A checker on a different model | coming |
 | 6 | Intent debt: the trap in bug 4 | coming |
 | 7 | The human gate | coming |
 | 8 | Triggers: schedule and hook | coming |
 
-Diagrams: [stage 0 scaffold](../assets/stage0_scaffold.png) · [final architecture](../assets/final_architecture.png)
+Diagrams: [stage 0 scaffold](../assets/stage0_scaffold.png) · stage flows [1](../assets/stage1_flow.png) [2](../assets/stage2_flow.png) [3](../assets/stage3_flow.png) [4](../assets/stage4_flow.png) · [final architecture](../assets/final_architecture.png)

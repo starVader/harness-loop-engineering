@@ -1,5 +1,7 @@
 # Stage 2: a vague goal vs a goal code can check
 
+![Stage 2 flow](../assets/stage2_flow.png)
+
 **You learn:** "done" is a claim until something other than the model checks
 it. A goal is only as good as its `is_met()`.
 

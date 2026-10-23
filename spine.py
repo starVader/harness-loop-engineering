@@ -34,6 +34,7 @@ class PassRecord:
     tests_summary: str
     input_tokens: int
     output_tokens: int
+    compacted: bool = False  # the conversation was restarted from the spine after this pass
 
 
 @dataclass
@@ -93,10 +94,14 @@ def failing_tests_from(pytest_output: str) -> List[str]:
     ]
 
 
-def progress_note(spine: Spine) -> str:
-    """The resume briefing the model reads in place of its lost conversation."""
+def progress_note(spine: Spine, reason: str) -> str:
+    """The briefing the model reads in place of its lost conversation.
+
+    reason says why the conversation restarted, e.g. "after an interruption"
+    or "to keep the context small", so the model is told the truth about it.
+    """
     lines = [
-        "This run is resuming after an interruption. Progress so far (from progress.json):",
+        f"This conversation was restarted {reason}. Progress so far (from progress.json):",
     ]
     for record in spine.passes:
         lines.append(f"- pass {record.pass_number}: {', '.join(record.tool_calls) or 'no tools'} -> {record.tests_summary}")

@@ -1,5 +1,7 @@
 # Stage 1: the bare loop
 
+![Stage 1 flow](../assets/stage1_flow.png)
+
 **You learn:** what one trip around act → observe → adjust looks like in real
 code, and that *your code*, not the model, decides when the work is done.
 

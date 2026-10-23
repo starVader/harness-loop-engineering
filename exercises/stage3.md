@@ -1,5 +1,7 @@
 # Stage 3: the spine, memory that survives a crash
 
+![Stage 3 flow](../assets/stage3_flow.png)
+
 **You learn:** when a run dies, the conversation dies with it. Only what you
 wrote to disk survives, and what you choose to write decides how well the
 next run can continue.

@@ -23,6 +23,7 @@ import anthropic
 MODEL = "claude-sonnet-5-5"
 MAX_TOKENS = 16000
 MAX_PASSES = 8
+COMPACT_AT_INPUT_TOKENS = 5_000  # low on purpose: these runs peak around 8K
 
 SYSTEM_PROMPT = """
     This system is a checkout service. It is at the heart of ordering system where real money is involved in customer checkouts. 
@@ -76,6 +77,11 @@ def call_model(client: anthropic.Anthropic, messages: List[MessageParam]) -> Mes
         messages=messages,
     )
 
+def compact_history(task: str, spine: Spine) -> List[MessageParam]:
+    """Start a fresh conversation: the task plus what the spine says was learned."""
+    briefing = progress_note(spine, reason="to keep the context small")
+    return [{"role": "user", "content": f"{task}\n\n{briefing}"}]
+
 def open_spine(goal: Goal, fresh: bool) -> Optional[Spine]:
     """Decide whether to resume. Returns None when the run must not start at all."""
     spine = None if fresh else load_spine()
@@ -97,15 +103,17 @@ def open_spine(goal: Goal, fresh: bool) -> Optional[Spine]:
     return spine
 
 
-def main(goal: Goal, fresh: bool, stop_after: Optional[int]) -> None:
+def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optional[int]) -> None:
     spine = open_spine(goal, fresh)
     if spine is None:
         return
 
     client = anthropic.Anthropic()
-    task = TASK_TEMPLATE.format(goal=goal.description)
+    # base_task never carries a briefing, so compaction can't stack an old one under a new one
+    base_task = TASK_TEMPLATE.format(goal=goal.description)
+    task = base_task
     if spine.passes:
-        task += "\n" + progress_note(spine)
+        task += "\n" + progress_note(spine, reason="after an interruption")
     messages: List[MessageParam] = [{"role": "user", "content": task}]
     total_input = total_output = 0
     first_pass = len(spine.passes) + 1
@@ -169,6 +177,14 @@ def main(goal: Goal, fresh: bool, stop_after: Optional[int]) -> None:
             print("  goal      not met yet")
         save_spine(spine)
 
+        # Compact: only here, where the history is complete and the spine holds this pass
+        if compact_at is not None and response.usage.input_tokens > compact_at:
+            print(f"COMPACTED after pass {pass_number}: last call was {response.usage.input_tokens} input tokens "
+                  f"(limit {compact_at}); restarting the conversation from the spine")
+            spine.passes[-1].compacted = True
+            save_spine(spine)
+            messages = compact_history(base_task, spine)
+
         if stop_after is not None and pass_number - first_pass + 1 >= stop_after:
             print(f"SIMULATED CRASH after {stop_after} pass(es): exiting without finishing; progress.json keeps status={STATUS_RUNNING}")
             return
@@ -188,5 +204,15 @@ if __name__ == "__main__":
     parser.add_argument("--goal", choices=sorted(GOALS), default="pytest")
     parser.add_argument("--fresh", action="store_true", help="ignore progress.json and start over")
     parser.add_argument("--stop-after", type=int, help="simulate a crash after N passes of this run")
+    parser.add_argument("--no-compact", action="store_true", help="never compact (the baseline for stage 4)")
+    parser.add_argument("--compact-at", type=int, default=COMPACT_AT_INPUT_TOKENS,
+                        help=f"compact once a call's input tokens exceed this (default {COMPACT_AT_INPUT_TOKENS})")
     args = parser.parse_args()
-    main(GOALS[args.goal], fresh=args.fresh, stop_after=args.stop_after)
+    if args.compact_at <= 0:
+        parser.error("--compact-at must be a positive number of tokens; use --no-compact to turn compaction off")
+    main(
+        GOALS[args.goal],
+        fresh=args.fresh,
+        stop_after=args.stop_after,
+        compact_at=None if args.no_compact else args.compact_at,
+    )
