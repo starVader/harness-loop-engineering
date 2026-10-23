@@ -15,7 +15,7 @@ One file per stage. Work through them in order; each one builds on the last.
 | Stage | What you learn | Exercise |
 |---|---|---|
 | 1 | The bare loop: act, observe, adjust | [stage1.md](stage1.md) |
-| 2 | A vague goal vs a goal code can check | coming |
+| 2 | A vague goal vs a goal code can check | [stage2.md](stage2.md) |
 | 3 | The spine: memory across runs | coming |
 | 4 | Context: fresh vs growing, compaction | coming |
 | 5 | A checker on a different model | coming |

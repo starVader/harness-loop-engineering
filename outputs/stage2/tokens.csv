@@ -1,0 +1,10 @@
+goal,pass,input_tokens,output_tokens
+self,1,870,50
+self,2,2354,414
+self,3,6188,1635
+self,4,7917,27
+self,5,7977,722
+pytest,1,872,50
+pytest,2,2356,363
+pytest,3,5929,351
+pytest,4,6470,1392

@@ -1,7 +1,9 @@
+import argparse
 from typing import List
 
 from anthropic.types import Message, ToolResultBlockParam, messages, MessageParam
 
+from goal import GOALS, Goal
 from tools import TOOLS, execute_tool, run_tests
 import anthropic
 
@@ -16,9 +18,10 @@ SYSTEM_PROMPT = """
     Whenever you are unsure run the associated test to find more information, once done state your assumptions.
 """
 
-TASK = """
-    Tests are failing in checkout service. Run all the tests in tests folder to see what is wrong.
-    Read each failure carefully and fix the code. The task is done once every test in tests/ is passing.
+# Stage 2: only the goal sentence changes between runs; everything else is held constant.
+TASK_TEMPLATE = """
+    You are working on the checkout service in this repository.
+    Your goal: {goal}
     When finished, summarise each change and why.
 """
 
@@ -60,10 +63,12 @@ def call_model(client: anthropic.Anthropic, messages: List[MessageParam]) -> Mes
         messages=messages,
     )
 
-def main():
+def main(goal: Goal) -> None:
     client = anthropic.Anthropic()
-    messages: List[MessageParam] = [{"role": "user", "content": TASK}]
+    task = TASK_TEMPLATE.format(goal=goal.description)
+    messages: List[MessageParam] = [{"role": "user", "content": task}]
     total_input = total_output = 0
+    print(f"=== goal={goal.name}: {goal.description}")
 
     for pass_number in range(1, MAX_PASSES + 1):
         # Act: the model decides what to do next
@@ -74,29 +79,39 @@ def main():
         print_response(response)
         messages.append({"role": "assistant", "content": response.content})
 
-        # The model stopped asking for tools: check whether it is right
+        # The model stopped asking for tools: it is claiming it is done
         if response.stop_reason != "tool_use":
-            test_run = run_tests()
-            if test_run.exit_code == 0:
-                print(f"DONE: model stopped and tests pass ({test_run.summary})")
+            verdict = goal.is_met()
+            if verdict is None:
+                print(f"ACCEPTED ON THE MODEL'S WORD: stop_reason={response.stop_reason}; code cannot check this goal")
+            elif verdict:
+                print("DONE: model stopped and the goal is verified")
             else:
-                print(f"STOPPED EARLY: stop_reason={response.stop_reason} but tests fail ({test_run.summary})")
+                print(f"STOPPED EARLY: stop_reason={response.stop_reason} but the goal is not met")
             break
 
         # Observe: run every tool, send all results back in one message
         messages.append({"role": "user", "content": run_tool_calls(response)})
 
-        # Goal: your code decides "done", not the model
-        test_run = run_tests()
-        print(f"  goal      {test_run.summary}")
-        if test_run.exit_code == 0:
-            print(f"DONE: goal met on pass {pass_number}")
+        # Goal: your code decides "done" when it can; otherwise it has to keep going
+        verdict = goal.is_met()
+        if verdict is None:
+            print("  goal      cannot be checked by code; waiting for the model to stop")
+        elif verdict:
+            print(f"DONE: goal verified on pass {pass_number}")
             break
+        else:
+            print("  goal      not met yet")
     else:
         print(f"CAP HIT: {MAX_PASSES} passes used, goal not met")
 
+    # Outside observer: the same check for every goal, so runs can be compared
+    observer = run_tests()
+    print(f"observer: tests after the run: {observer.summary}")
     print(f"total tokens: input={total_input} output={total_output}")
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Run the loop against one goal.")
+    parser.add_argument("--goal", choices=sorted(GOALS), default="pytest")
+    main(GOALS[parser.parse_args().goal])
