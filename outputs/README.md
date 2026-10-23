@@ -25,8 +25,8 @@ Not every stage needs every file; each exercise lists what to save.
 | 0 Scaffold | [stage0/](stage0/) | done: green, broken and guardrail evidence |
 | 1 Bare loop | [stage1/](stage1/) | done: goal met on pass 3, 4 fixes |
 | 2 Bad goal vs oracle | [stage2/](stage2/) | done: both fixed the bugs; self-assessed cost 62% more input |
-| 3 Spine | stage3/ | next |
-| 4 Context | stage4/ | |
+| 3 Spine | [stage3/](stage3/) | done: crash + resume finished on pass 4; rerun is a no-op |
+| 4 Context | stage4/ | next |
 | 5 Checker | stage5/ | |
 | 6 Intent debt | stage6/ | |
 | 7 Human gate | stage7/ (your fix explanations go here) | |

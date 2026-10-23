@@ -16,7 +16,7 @@ One file per stage. Work through them in order; each one builds on the last.
 |---|---|---|
 | 1 | The bare loop: act, observe, adjust | [stage1.md](stage1.md) |
 | 2 | A vague goal vs a goal code can check | [stage2.md](stage2.md) |
-| 3 | The spine: memory across runs | coming |
+| 3 | The spine: memory across runs | [stage3.md](stage3.md) |
 | 4 | Context: fresh vs growing, compaction | coming |
 | 5 | A checker on a different model | coming |
 | 6 | Intent debt: the trap in bug 4 | coming |
