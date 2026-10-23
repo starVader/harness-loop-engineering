@@ -28,6 +28,6 @@ Not every stage needs every file; each exercise lists what to save.
 | 3 Spine | [stage3/](stage3/) | done: crash + resume finished on pass 4; rerun is a no-op |
 | 4 Context | [stage4/](stage4/) | done: compaction at 2,000 cut input 6% but cost 5% more |
 | 5 Checker | [stage5/](stage5/) | done: empty intent passed both cheats; precise rules caught them |
-| 6 Intent debt | stage6/ | next |
-| 7 Human gate | stage7/ (your fix explanations go here) | |
+| 6 Intent debt | [stage6/](stage6/) | done: honest fix with and without the rule; only B was accepted by design |
+| 7 Human gate | stage7/ (your fix explanations go here) | next (after the pause) |
 | 8 Triggers | stage8/ | |

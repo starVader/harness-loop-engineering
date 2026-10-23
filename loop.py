@@ -21,7 +21,7 @@ from spine import (
 from tools import TOOLS, execute_tool, run_tests
 import anthropic
 
-MODEL = "claude-sonnet-5-5"
+ACTOR_MODELS = {"sonnet": "claude-sonnet-5-5", "haiku": "claude-haiku-5-5"}
 MAX_TOKENS = 16000
 MAX_PASSES = 8
 COMPACT_AT_INPUT_TOKENS = 5_000  # low on purpose: these runs peak around 8K
@@ -69,9 +69,9 @@ def run_tool_calls(response: Message) -> List[ToolResultBlockParam]:
         })
     return tool_results
 
-def call_model(client: anthropic.Anthropic, messages: List[MessageParam]) -> Message:
+def call_model(client: anthropic.Anthropic, messages: List[MessageParam], model: str) -> Message:
     return client.messages.create(
-        model=MODEL,
+        model=model,
         max_tokens=MAX_TOKENS,
         system=SYSTEM_PROMPT,
         tools=TOOLS,
@@ -113,7 +113,8 @@ def open_spine(goal: Goal, fresh: bool) -> Optional[Spine]:
     return spine
 
 
-def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optional[int], check: bool) -> None:
+def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optional[int], check: bool,
+         actor_model: str) -> None:
     spine = open_spine(goal, fresh)
     if spine is None:
         return
@@ -127,13 +128,13 @@ def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optiona
     messages: List[MessageParam] = [{"role": "user", "content": task}]
     total_input = total_output = 0
     first_pass = len(spine.passes) + 1
-    print(f"=== goal={goal.name}: {goal.description}")
+    print(f"=== goal={goal.name}: {goal.description}  actor={actor_model}")
     if spine.passes:
         print(f"=== RESUMING from progress.json at pass {first_pass} (passes count toward the same cap of {MAX_PASSES})")
 
     for pass_number in range(first_pass, MAX_PASSES + 1):
         # Act: the model decides what to do next
-        response = call_model(client, messages)
+        response = call_model(client, messages, actor_model)
         total_input += response.usage.input_tokens
         total_output += response.usage.output_tokens
         print(f"--- pass {pass_number}/{MAX_PASSES}")
@@ -245,6 +246,7 @@ if __name__ == "__main__":
     parser.add_argument("--compact-at", type=int, default=COMPACT_AT_INPUT_TOKENS,
                         help=f"compact once a call's input tokens exceed this (default {COMPACT_AT_INPUT_TOKENS})")
     parser.add_argument("--no-check", action="store_true", help="skip the checker (accept on tests alone)")
+    parser.add_argument("--actor-model", choices=sorted(ACTOR_MODELS), default="sonnet", help="model that writes the fixes")
     args = parser.parse_args()
     if args.compact_at <= 0:
         parser.error("--compact-at must be a positive number of tokens; use --no-compact to turn compaction off")
@@ -254,4 +256,5 @@ if __name__ == "__main__":
         stop_after=args.stop_after,
         compact_at=None if args.no_compact else args.compact_at,
         check=not args.no_check,
+        actor_model=ACTOR_MODELS[args.actor_model],
     )

@@ -1,0 +1,45 @@
+diff --git a/checkout/checkout.py b/checkout/checkout.py
+index d968e8d..4a6c2c7 100644
+--- a/checkout/checkout.py
++++ b/checkout/checkout.py
+@@ -27,11 +27,13 @@ class Totals:
+ 
+ 
+ def round_money(amount: Decimal) -> Decimal:
+-    return amount.quantize(PAISE)
++    # Invoice rounding: half paisa always rounds up (not banker's rounding).
++    return amount.quantize(PAISE, rounding=ROUND_HALF_UP)
+ 
+ 
+ def _order_date(order: Order) -> date:
+-    return (order.paid_at or order.placed_at).date()
++    # Codes are honoured by when the order was placed, not when it was paid.
++    return order.placed_at.date()
+ 
+ 
+ def compute_total(order: Order, catalog: Dict[str, DiscountCode] = CATALOG) -> Totals:
+@@ -44,8 +46,9 @@ def compute_total(order: Order, catalog: Dict[str, DiscountCode] = CATALOG) -> T
+         code = validate_code(order.codes[0], subtotal, _order_date(order), catalog)
+         discount = discount_amount(subtotal, code)
+ 
++    # GST is charged on the discounted amount.
+     taxable = subtotal - discount
+-    tax = tax_on(subtotal)
++    tax = tax_on(taxable)
+     return Totals(
+         subtotal=round_money(subtotal),
+         discount=round_money(discount),
+diff --git a/checkout/discounts.py b/checkout/discounts.py
+index e9f1778..bcaff9a 100644
+--- a/checkout/discounts.py
++++ b/checkout/discounts.py
+@@ -36,7 +36,8 @@ def validate_code(
+         raise DiscountRejected("unknown")
+     if order_date > code.expires_on:
+         raise DiscountRejected("expired")
+-    if subtotal <= code.min_subtotal:
++    # Minimum spend is inclusive: a subtotal equal to min_subtotal qualifies.
++    if subtotal < code.min_subtotal:
+         raise DiscountRejected("below_min_spend")
+     return code
+ 
