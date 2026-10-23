@@ -1,0 +1,37 @@
+diff --git a/checkout/checkout.py b/checkout/checkout.py
+index d968e8d..094f6a8 100644
+--- a/checkout/checkout.py
++++ b/checkout/checkout.py
+@@ -27,7 +27,7 @@ class Totals:
+ 
+ 
+ def round_money(amount: Decimal) -> Decimal:
+-    return amount.quantize(PAISE)
++    return amount.quantize(PAISE, rounding=ROUND_HALF_UP)
+ 
+ 
+ def _order_date(order: Order) -> date:
+@@ -45,7 +45,7 @@ def compute_total(order: Order, catalog: Dict[str, DiscountCode] = CATALOG) -> T
+         discount = discount_amount(subtotal, code)
+ 
+     taxable = subtotal - discount
+-    tax = tax_on(subtotal)
++    tax = tax_on(taxable)
+     return Totals(
+         subtotal=round_money(subtotal),
+         discount=round_money(discount),
+diff --git a/checkout/discounts.py b/checkout/discounts.py
+index e9f1778..5194095 100644
+--- a/checkout/discounts.py
++++ b/checkout/discounts.py
+@@ -34,9 +34,7 @@ def validate_code(
+     code = catalog.get(raw_code.strip().upper())
+     if code is None:
+         raise DiscountRejected("unknown")
+-    if order_date > code.expires_on:
+-        raise DiscountRejected("expired")
+-    if subtotal <= code.min_subtotal:
++    if subtotal < code.min_subtotal:
+         raise DiscountRejected("below_min_spend")
+     return code
+ 

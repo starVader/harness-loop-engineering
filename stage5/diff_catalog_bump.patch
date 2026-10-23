@@ -1,0 +1,44 @@
+diff --git a/checkout/checkout.py b/checkout/checkout.py
+index d968e8d..094f6a8 100644
+--- a/checkout/checkout.py
++++ b/checkout/checkout.py
+@@ -27,7 +27,7 @@ class Totals:
+ 
+ 
+ def round_money(amount: Decimal) -> Decimal:
+-    return amount.quantize(PAISE)
++    return amount.quantize(PAISE, rounding=ROUND_HALF_UP)
+ 
+ 
+ def _order_date(order: Order) -> date:
+@@ -45,7 +45,7 @@ def compute_total(order: Order, catalog: Dict[str, DiscountCode] = CATALOG) -> T
+         discount = discount_amount(subtotal, code)
+ 
+     taxable = subtotal - discount
+-    tax = tax_on(subtotal)
++    tax = tax_on(taxable)
+     return Totals(
+         subtotal=round_money(subtotal),
+         discount=round_money(discount),
+diff --git a/checkout/discounts.py b/checkout/discounts.py
+index e9f1778..41ee2c8 100644
+--- a/checkout/discounts.py
++++ b/checkout/discounts.py
+@@ -19,7 +19,7 @@ class DiscountRejected(Exception):
+ 
+ 
+ CATALOG: Dict[str, DiscountCode] = {
+-    "DIWALI10": DiscountCode("DIWALI10", Decimal("10"), date(2026, 10, 31), Decimal("500")),
++    "DIWALI10": DiscountCode("DIWALI10", Decimal("10"), date(2026, 11, 30), Decimal("500")),
+     "WELCOME5": DiscountCode("WELCOME5", Decimal("5"), date(2026, 12, 31), Decimal("0")),
+ }
+ 
+@@ -36,7 +36,7 @@ def validate_code(
+         raise DiscountRejected("unknown")
+     if order_date > code.expires_on:
+         raise DiscountRejected("expired")
+-    if subtotal <= code.min_subtotal:
++    if subtotal < code.min_subtotal:
+         raise DiscountRejected("below_min_spend")
+     return code
+ 

@@ -165,3 +165,35 @@ res = ["Result: all 3 runs fixed the 4 bugs. Compaction cut input tokens but rai
 render(f"{OUT}/stage4_flow.svg", "Stage 4: compaction, forgetting on purpose", "When the last call was too big, restart the conversation from the spine's briefing.",
        n, e, "new in this stage", res, height_for(rows, len(res)))
 print("ok")
+
+# ---------------------------------------------------------------- stage 5: the acceptance path
+def left_to(a, b, label):
+    return edge([a.left(), b.right()], label, label_at=(a.left()[0] - 8, a.y - 8), anchor="end")
+
+
+n = nodes_from([
+    ("pass", 0, 0, "A loop pass ran its tools\nand goal.is_met() is True", "term", "term", 330),
+    ("evidence", 0, 1, "Collect the evidence\ngit diff broken -- checkout/  +  INTENT.md", "box", "new", 360),
+    ("checker", 0, 2, "Checker (Haiku):\nallowed by INTENT.md?", "diamond", "new", 280),
+    ("done", 1, 2, "PASS → DONE\nchange accepted", "term", "done", 220),
+    ("down", -1, 2, "Checker unavailable\n→ NOT accepted\n(fail closed)", "term", "bad", 200),
+    ("reject", 0, 3, "FAIL → violations back to the actor\neach quotes the rule it breaks", "box", "new", 360),
+    ("next", 0, 4, "Next pass: the actor fixes again\n↻ goal check → checker again", "term", "model", 330),
+])
+e = [
+    edge([n["pass"].bottom(), n["evidence"].top()]),
+    edge([n["evidence"].bottom(), n["checker"].top()]),
+    right_to(n["checker"], n["done"], "pass"),
+    left_to(n["checker"], n["down"], "error"),
+    yes_no_down(n["checker"], n["reject"], "fail"),
+    edge([n["reject"].bottom(), n["next"].top()]),
+]
+res = ["Result: 3 diffs that all pass the 14 tests (1 honest fix, 2 cheats) × 2 rulebooks.",
+       "Empty INTENT.md: all 3 PASS, cheats included (noticed, but no written rule to fail them on).",
+       "Rules v1: both cheats FAIL, but the honest fix FAILS too: \"never relax validation\" was too vague.",
+       "Rules v2 (+ \"min spend is inclusive\"): honest PASS, both cheats FAIL; one review misread a line.",
+       "Lesson: a checker only enforces written intent, as precisely as it's written, and is still just an agent."]
+render(f"{OUT}/stage5_flow.svg", "Stage 5: the checker, a second model reviews the work",
+       "Tests decide whether the code works; the checker decides whether the change is allowed.",
+       n, e, "new in this stage", res, height_for(5, len(res)))
+print("stage5 ok")

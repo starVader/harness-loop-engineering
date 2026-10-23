@@ -35,6 +35,7 @@ class PassRecord:
     input_tokens: int
     output_tokens: int
     compacted: bool = False  # the conversation was restarted from the spine after this pass
+    checker: Optional[str] = None  # "pass" / "fail" when the checker reviewed this pass
 
 
 @dataclass

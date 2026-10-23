@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from anthropic.types import Message, ToolResultBlockParam, messages, MessageParam
 
+from checker import CheckerUnavailable, INTENT_PATH, current_diff, feedback_for_actor, print_verdict, review_diff
 from goal import GOALS, Goal
 from spine import (
     STATUS_DONE,
@@ -82,6 +83,15 @@ def compact_history(task: str, spine: Spine) -> List[MessageParam]:
     briefing = progress_note(spine, reason="to keep the context small")
     return [{"role": "user", "content": f"{task}\n\n{briefing}"}]
 
+def checker_feedback(client: anthropic.Anthropic, check: bool) -> Optional[str]:
+    """Review the loop's change against INTENT.md. None = accepted; a string = the rejection to send back."""
+    if not check:
+        print("checker: off (--no-check)")
+        return None
+    verdict = review_diff(client, current_diff(), INTENT_PATH.read_text())
+    print_verdict(verdict)
+    return None if verdict.passed else feedback_for_actor(verdict)
+
 def open_spine(goal: Goal, fresh: bool) -> Optional[Spine]:
     """Decide whether to resume. Returns None when the run must not start at all."""
     spine = None if fresh else load_spine()
@@ -103,7 +113,7 @@ def open_spine(goal: Goal, fresh: bool) -> Optional[Spine]:
     return spine
 
 
-def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optional[int]) -> None:
+def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optional[int], check: bool) -> None:
     spine = open_spine(goal, fresh)
     if spine is None:
         return
@@ -135,10 +145,21 @@ def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optiona
             verdict = goal.is_met()
             if verdict is None:
                 print(f"ACCEPTED ON THE MODEL'S WORD: stop_reason={response.stop_reason}; code cannot check this goal")
-            elif verdict:
-                print("DONE: model stopped and the goal is verified")
-            else:
+            elif not verdict:
                 print(f"STOPPED EARLY: stop_reason={response.stop_reason} but the goal is not met")
+            else:
+                try:
+                    feedback = checker_feedback(client, check)
+                except CheckerUnavailable as exc:
+                    print(f"CHECKER UNAVAILABLE: {exc}; not accepting the change")
+                    spine.status = STATUS_STOPPED
+                    save_spine(spine)
+                    break
+                if feedback is not None:
+                    print("CHECKER REJECTED: the goal is met but the change breaks INTENT.md; sending the violations back")
+                    messages.append({"role": "user", "content": feedback})
+                    continue
+                print("DONE: model stopped, the goal is verified and the change is accepted")
             spine.status = STATUS_DONE if verdict else STATUS_STOPPED
             save_spine(spine)
             break
@@ -165,14 +186,26 @@ def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optiona
         ))
 
         # Goal: your code decides "done" when it can; otherwise it has to keep going
+        rejection: Optional[str] = None
         verdict = goal.is_met()
         if verdict is None:
             print("  goal      cannot be checked by code; waiting for the model to stop")
         elif verdict:
-            print(f"DONE: goal verified on pass {pass_number}")
-            spine.status = STATUS_DONE
-            save_spine(spine)
-            break
+            # Checker: the tests say it works; the checker says whether it is allowed
+            try:
+                rejection = checker_feedback(client, check)
+            except CheckerUnavailable as exc:
+                print(f"CHECKER UNAVAILABLE: {exc}; not accepting the change")
+                spine.status = STATUS_STOPPED
+                save_spine(spine)
+                break
+            spine.passes[-1].checker = None if not check else ("pass" if rejection is None else "fail")
+            if rejection is None:
+                print(f"DONE: goal verified on pass {pass_number} and the change is accepted")
+                spine.status = STATUS_DONE
+                save_spine(spine)
+                break
+            print("CHECKER REJECTED: the goal is met but the change breaks INTENT.md; sending the violations back")
         else:
             print("  goal      not met yet")
         save_spine(spine)
@@ -184,6 +217,10 @@ def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optiona
             spine.passes[-1].compacted = True
             save_spine(spine)
             messages = compact_history(base_task, spine)
+
+        # A rejection goes in after any compaction, so forgetting can't drop it
+        if rejection is not None:
+            messages.append({"role": "user", "content": rejection})
 
         if stop_after is not None and pass_number - first_pass + 1 >= stop_after:
             print(f"SIMULATED CRASH after {stop_after} pass(es): exiting without finishing; progress.json keeps status={STATUS_RUNNING}")
@@ -207,6 +244,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-compact", action="store_true", help="never compact (the baseline for stage 4)")
     parser.add_argument("--compact-at", type=int, default=COMPACT_AT_INPUT_TOKENS,
                         help=f"compact once a call's input tokens exceed this (default {COMPACT_AT_INPUT_TOKENS})")
+    parser.add_argument("--no-check", action="store_true", help="skip the checker (accept on tests alone)")
     args = parser.parse_args()
     if args.compact_at <= 0:
         parser.error("--compact-at must be a positive number of tokens; use --no-compact to turn compaction off")
@@ -215,4 +253,5 @@ if __name__ == "__main__":
         fresh=args.fresh,
         stop_after=args.stop_after,
         compact_at=None if args.no_compact else args.compact_at,
+        check=not args.no_check,
     )
