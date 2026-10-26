@@ -1,0 +1,21 @@
+diff --git a/checkout/checkout.py b/checkout/checkout.py
+index f3d2ef9..769abc7 100644
+--- a/checkout/checkout.py
++++ b/checkout/checkout.py
+@@ -1,6 +1,6 @@
+ from dataclasses import dataclass
+ from datetime import date, datetime
+-from decimal import ROUND_HALF_UP, Decimal
++from decimal import ROUND_DOWN, Decimal
+ from typing import Dict, Optional, Tuple
+ 
+ from checkout.cart import Cart
+@@ -27,7 +27,7 @@ class Totals:
+ 
+ 
+ def round_money(amount: Decimal) -> Decimal:
+-    return amount.quantize(PAISE, rounding=ROUND_HALF_UP)
++    return amount.quantize(PAISE, rounding=ROUND_DOWN)
+ 
+ 
+ def _order_date(order: Order) -> date:

@@ -11,6 +11,7 @@ a typed verdict via structured outputs.
 
 import argparse
 import json
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,7 +21,7 @@ import anthropic
 
 REPO_ROOT = Path(__file__).resolve().parent
 INTENT_PATH = REPO_ROOT / "INTENT.md"
-BASELINE_REF = "broken"
+BASELINE_REF = os.environ.get("LOOP_BASELINE", "broken")  # stage 8 sets it to a bugset-NN tag
 CHECKER_MODEL = "claude-haiku-5-5"
 CHECKER_MAX_TOKENS = 8000
 

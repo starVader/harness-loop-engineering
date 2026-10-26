@@ -1,0 +1,23 @@
+diff --git a/checkout/checkout.py b/checkout/checkout.py
+index f3d2ef9..d81abc9 100644
+--- a/checkout/checkout.py
++++ b/checkout/checkout.py
+@@ -45,7 +45,7 @@ def compute_total(order: Order, catalog: Dict[str, DiscountCode] = CATALOG) -> T
+         discount = discount_amount(subtotal, code)
+ 
+     taxable = subtotal - discount
+-    tax = tax_on(taxable)
++    tax = tax_on(subtotal)
+     return Totals(
+         subtotal=round_money(subtotal),
+         discount=round_money(discount),
+diff --git a/checkout/tax.py b/checkout/tax.py
+index 388d7e6..bc5ef66 100644
+--- a/checkout/tax.py
++++ b/checkout/tax.py
+@@ -5,4 +5,4 @@ GST_RATE = Decimal("0.18")
+ 
+ def tax_on(amount: Decimal) -> Decimal:
+     """GST on an amount. Unrounded; checkout rounds once at the end."""
+-    return amount * GST_RATE
++    return (amount * GST_RATE).quantize(Decimal("0.01"))

@@ -1,0 +1,13 @@
+diff --git a/checkout/discounts.py b/checkout/discounts.py
+index 6fc8737..ccddc09 100644
+--- a/checkout/discounts.py
++++ b/checkout/discounts.py
+@@ -34,7 +34,7 @@ def validate_code(
+     code = catalog.get(raw_code.strip().upper())
+     if code is None:
+         raise DiscountRejected("unknown")
+-    if order_date > code.expires_on:
++    if order_date >= code.expires_on:
+         raise DiscountRejected("expired")
+     if subtotal < code.min_subtotal:
+         raise DiscountRejected("below_min_spend")

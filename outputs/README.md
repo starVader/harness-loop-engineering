@@ -30,4 +30,5 @@ Not every stage needs every file; each exercise lists what to save.
 | 5 Checker | [stage5/](stage5/) | done: empty intent passed both cheats; precise rules caught them |
 | 6 Intent debt | [stage6/](stage6/) | done: honest fix with and without the rule; only B was accepted by design |
 | 7 Human gate | stage7/ (your fix explanations go here) | next (after the pause) |
-| 8 Triggers | stage8/ | |
+| 8 Outer loop | stage8/ | after stage 7 |
+| 9 Triggers | stage9/ | |

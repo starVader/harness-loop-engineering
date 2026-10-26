@@ -2,7 +2,7 @@
 
 Hands-on rebuild of the loop from IBM Technology's *What Is Loop Engineering?*:
 **goal (verifiable stop) → act → observe → adjust → repeat**, plus the things
-built around it — spine, context, checker, intent, human gate, triggers.
+built around it — spine, context, checker, intent, human gate, learning, triggers.
 
 The system under repair is a tiny checkout service with 4 injected bugs. You
 write the loop; the tests are the oracle.
@@ -27,8 +27,9 @@ Reset the code between runs: `git restore --source=broken -- checkout/`. This pu
 | File | Author |
 |---|---|
 | `checkout/`, `tests/`, `tools.py`, `INTENT.md` | given (stage 0) |
-| `goal.py`, `loop.py`, `spine.py` | **you** |
+| `goal.py`, `loop.py`, `spine.py`, `reflect.py` | **you** |
 | `checker.py`, `gate.py` | given as references at stages 5 and 7 |
+| `stage8/` (bug sets, audit) | given at stage 8 |
 
 `tools.py` exposes `TOOLS` (Anthropic tool schemas) and `execute_tool(name, input) -> ToolOutcome`.
 The actor can write only `checkout/*.py`; `run_tests` has a fixed invocation. Use `tools.run_tests()` directly as your oracle.
@@ -41,8 +42,10 @@ The actor can write only `checkout/*.py`; `run_tests` has a fixed invocation. Us
 5. **Checker** — Haiku reviews `git diff broken` against `INTENT.md`; a fail feeds back into the loop.
 6. **Intent debt** — run without a discount rule in `INTENT.md`, then with one. Watch what the actor does to the expiry check.
 7. **Human gate** — no pass is accepted without your one-sentence explanation in `outputs/stage7/fixes.md`.
-8. **Triggers** — nightly cron in a *separate clone*; a git post-commit hook.
+8. **Outer loop** — `reflect.py` reads past runs and audit incidents, proposes `INTENT.md` rules and `LESSONS.md`; you gate them. Learn on bug sets 01-03, measure on unseen 04-06.
+9. **Triggers** — nightly cron in a *separate clone*; a git post-commit hook.
 
 ## Lab rules
 - Don't read `stage0/inject_bugs.patch` before stage 6 — it spoils the trap.
+- Don't read `stage8/bugsets/` or `stage8/audit/` before your stage 8 notes are written.
 - The tests deliberately do **not** cover every business rule. That gap is the point of stages 5–6.

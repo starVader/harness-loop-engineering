@@ -1,0 +1,31 @@
+diff --git a/checkout/checkout.py b/checkout/checkout.py
+index f3d2ef9..ed116c9 100644
+--- a/checkout/checkout.py
++++ b/checkout/checkout.py
+@@ -1,6 +1,6 @@
+ from dataclasses import dataclass
+ from datetime import date, datetime
+-from decimal import ROUND_HALF_UP, Decimal
++from decimal import ROUND_HALF_EVEN, Decimal
+ from typing import Dict, Optional, Tuple
+ 
+ from checkout.cart import Cart
+@@ -27,7 +27,7 @@ class Totals:
+ 
+ 
+ def round_money(amount: Decimal) -> Decimal:
+-    return amount.quantize(PAISE, rounding=ROUND_HALF_UP)
++    return amount.quantize(PAISE, rounding=ROUND_HALF_EVEN)
+ 
+ 
+ def _order_date(order: Order) -> date:
+diff --git a/checkout/discounts.py b/checkout/discounts.py
+index 6fc8737..f00653f 100644
+--- a/checkout/discounts.py
++++ b/checkout/discounts.py
+@@ -42,4 +42,4 @@ def validate_code(
+ 
+ 
+ def discount_amount(subtotal: Decimal, code: DiscountCode) -> Decimal:
+-    return subtotal * code.percent_off / Decimal("100")
++    return (subtotal * code.percent_off / Decimal("100")).quantize(Decimal("0.01"))
