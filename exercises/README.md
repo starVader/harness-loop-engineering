@@ -1,27 +1,29 @@
 # Exercises
 
-One file per stage. Work through them in order; each one builds on the last.
+One guide per layer. Each one has the same shape:
 
-## How every stage works
-1. Read `stageN.md`.
-2. Reset the code: `git restore --source=broken -- checkout/`
-3. Write or change your code (`goal.py`, `loop.py`, `spine.py`).
-4. Run it. Raw output goes to `runs/` (gitignored).
-5. Copy the run worth keeping into `../outputs/stageN/` (see [outputs/README.md](../outputs/README.md)).
-6. Write `outputs/stageN/notes.md`: what happened, in your words.
-7. Commit.
+- **The idea**: what the layer is for, in a few sentences.
+- **In the code**: where it lives, so you can read it next to the guide.
+- **Run it**: the exact commands, with the later layers switched off so this one stands alone.
+- **What happened when we ran it**: the recorded result in [results/](../results/).
+- **Try this**: experiments that change one thing and show why the layer exists.
 
-## Stages
-| Stage | What you learn | Exercise |
+Every run starts from a known state: `python -m harness.scenario apply broken`
+puts back the 4 bugs (it won't overwrite edits of your own without `--force`).
+Every run also leaves a trace: `python -m harness.trace show latest`.
+
+| Stage | Guide | Flowchart |
 |---|---|---|
-| 1 | The bare loop: act, observe, adjust | [stage1.md](stage1.md) |
-| 2 | A vague goal vs a goal code can check | [stage2.md](stage2.md) |
-| 3 | The spine: memory across runs | [stage3.md](stage3.md) |
-| 4 | Context: fresh vs growing, compaction | [stage4.md](stage4.md) |
-| 5 | A checker on a different model | [stage5.md](stage5.md) |
-| 6 | Intent debt: the trap in bug 4 | [stage6.md](stage6.md) |
-| 7 | The human gate | [stage7.md](stage7.md) |
-| 8 | The outer loop: learning from past runs | [stage8.md](stage8.md) |
-| 9 | Triggers: schedule and hook | coming |
+| 0 | [The playground: tools, guardrails, scenarios](stage0.md) | [scaffold](../assets/stage0_scaffold.png) |
+| 1 | [The bare loop](stage1.md) | [flow](../assets/stage1_flow.png) |
+| 2 | [Who decides "done"?](stage2.md) | [flow](../assets/stage2_flow.png) |
+| 3 | [The spine: memory that survives a crash](stage3.md) | [flow](../assets/stage3_flow.png) |
+| 4 | [Context: forgetting on purpose](stage4.md) | [flow](../assets/stage4_flow.png) |
+| 5 | [The checker: a second model reviews the work](stage5.md) | [flow](../assets/stage5_flow.png) |
+| 6 | [Intent debt: the rule nobody wrote](stage6.md) | [flow](../assets/stage6_flow.png) |
+| 7 | [The human gate](stage7.md) | [flow](../assets/stage7_flow.png) |
+| 8 | [The outer loop: learning from past runs](stage8.md) | [flow](../assets/stage8_flow.png) |
 
-Diagrams: [stage 0 scaffold](../assets/stage0_scaffold.png) · stage flows [1](../assets/stage1_flow.png) [2](../assets/stage2_flow.png) [3](../assets/stage3_flow.png) [4](../assets/stage4_flow.png) [5](../assets/stage5_flow.png) [6](../assets/stage6_flow.png) · [final architecture](../assets/final_architecture.png)
+The layers are cumulative but the guides aren't: you can jump straight to
+any stage. Stages 1-4 need only an API key. Stages 7-8 need you at the
+keyboard.

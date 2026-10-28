@@ -1,2 +1,2 @@
-anthropic
-pytest
+anthropic>=1.15
+pytest>=8

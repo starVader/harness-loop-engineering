@@ -4,8 +4,8 @@ A crash loses the whole API conversation. The spine keeps what was *learned*
 (which tests fail, which files were written, which tools ran), not what was
 *read*: the model can always re-read a file, but it can't recover a decision.
 
-Saved to progress.json after every pass (gitignored, and invisible to the
-actor). Plain dataclasses + json: no dependency beyond the stdlib.
+Saved to .harness/progress.json after every pass (gitignored, and invisible
+to the actor). Plain dataclasses + json: no dependency beyond the stdlib.
 """
 
 import hashlib
@@ -13,16 +13,16 @@ import json
 import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import List, Optional
 
-REPO_ROOT = Path(__file__).resolve().parent
-SPINE_PATH = REPO_ROOT / "progress.json"
-CODE_DIR = REPO_ROOT / "checkout"
+from harness.paths import CODE_DIR, STATE_DIR
+
+SPINE_PATH = STATE_DIR / "progress.json"
 
 STATUS_RUNNING = "running"  # in progress, or crashed: safe to resume
 STATUS_DONE = "done"  # goal verified: rerunning is a no-op
-STATUS_STOPPED = "stopped"  # model stopped, cap hit, or accepted on its word
+STATUS_STOPPED = "stopped"  # model stopped early, a reviewer was unavailable, or accepted on its word
+STATUS_ESCALATED = "escalated"  # a budget ran out: a human has to look before anything continues
 
 
 @dataclass
@@ -35,6 +35,7 @@ class PassRecord:
     input_tokens: int
     output_tokens: int
     compacted: bool = False  # the conversation was restarted from the spine after this pass
+    sensors: Optional[str] = None  # "pass" / "fail" when the fixed rules checked this pass
     checker: Optional[str] = None  # "pass" / "fail" when the checker reviewed this pass
     gate: Optional[str] = None  # "pass" / "fail" when a human reviewed this pass
 
@@ -46,6 +47,9 @@ class Spine:
     code_fingerprint: str
     started_at: str
     passes: List[PassRecord] = field(default_factory=list)
+    run_ids: List[str] = field(default_factory=list)  # one per process that worked on this spine: see harness/trace.py
+    escalation_reason: Optional[str] = None
+    spent_usd: float = 0.0  # actor + checker, across every run of this spine, so a resume can't reset the budget
 
 
 def fingerprint_code() -> str:
@@ -82,6 +86,7 @@ def load_spine() -> Optional[Spine]:
 def save_spine(spine: Spine) -> None:
     """Atomic write: a crash mid-save leaves the previous spine intact."""
     spine.code_fingerprint = fingerprint_code()
+    SPINE_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = SPINE_PATH.with_suffix(".json.tmp")
     tmp_path.write_text(json.dumps(asdict(spine), indent=2))
     os.replace(tmp_path, SPINE_PATH)

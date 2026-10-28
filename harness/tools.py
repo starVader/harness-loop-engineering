@@ -1,23 +1,22 @@
 """The actor's tools, and the guardrails that keep it from rigging the oracle.
 
 The actor sees only checkout/, tests/ and INTENT.md; everything else in the
-repo (venv, the bug patch, outputs, exercises) does not exist for it.
+repo (the harness itself, scenarios, the audit, results) does not exist for it.
+When a run uses another intent file (--intent), reading INTENT.md returns that
+file: the actor never learns which one it got.
 Writes are allowlisted to checkout/*.py. Tests, INTENT.md, pytest config and
 conftest are out of reach, so the only way to green is changing product code.
-run_tests takes no arguments: the model cannot choose what "passing" means.
+run_tests takes no arguments: the model cannot choose what "passing" means,
+and harness/sandbox.py decides where the code it wrote actually runs.
 """
 
-import subprocess
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List
 
-REPO_ROOT = Path(__file__).resolve().parent
-WRITABLE_DIR = REPO_ROOT / "checkout"
-PYTEST_CMD = [sys.executable, "-m", "pytest", "-q", "--tb=short", "-p", "no:cacheprovider", "tests/"]
-PYTEST_TIMEOUT_SECONDS = 60
-OUTPUT_TAIL_LINES = 60
+from harness.paths import CODE_DIR as WRITABLE_DIR, REPO_ROOT, intent_path
+from harness.sandbox import TestRun, run_pytest
+
 VISIBLE_DIRS = ("checkout", "tests")
 VISIBLE_FILES = ("INTENT.md",)
 
@@ -26,13 +25,6 @@ VISIBLE_FILES = ("INTENT.md",)
 class ToolOutcome:
     content: str
     is_error: bool = False
-
-
-@dataclass(frozen=True)
-class TestRun:
-    exit_code: int
-    summary: str
-    output_tail: str
 
 
 class PathRefused(Exception):
@@ -70,23 +62,8 @@ def _resolve_writable(relative_path: str) -> Path:
 
 
 def run_tests() -> TestRun:
-    try:
-        completed = subprocess.run(
-            PYTEST_CMD,
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=PYTEST_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired:
-        return TestRun(exit_code=-1, summary="timed out", output_tail="")
-    lines = (completed.stdout + completed.stderr).strip().splitlines()
-    summary = lines[-1] if lines else "no output"
-    return TestRun(
-        exit_code=completed.returncode,
-        summary=summary,
-        output_tail="\n".join(lines[-OUTPUT_TAIL_LINES:]),
-    )
+    """The oracle: the visible tests, with a fixed command, in the sandbox."""
+    return run_pytest("tests/")
 
 
 def _list_files(tool_input: Dict[str, Any]) -> ToolOutcome:
@@ -103,6 +80,8 @@ def _read_file(tool_input: Dict[str, Any]) -> ToolOutcome:
         path = _resolve_inside_repo(tool_input["path"])
     except PathRefused as refused:
         return ToolOutcome(str(refused), is_error=True)
+    if path == REPO_ROOT / "INTENT.md":
+        path = intent_path()
     if not path.is_file():
         return ToolOutcome(f"{tool_input['path']} does not exist", is_error=True)
     return ToolOutcome(path.read_text())

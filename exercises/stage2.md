@@ -1,52 +1,51 @@
-# Stage 2: a vague goal vs a goal code can check
+# Stage 2: who decides "done"?
 
 ![Stage 2 flow](../assets/stage2_flow.png)
 
-**You learn:** "done" is a claim until something other than the model checks
-it. A goal is only as good as its `is_met()`.
+**The idea.** "Make it better" is a goal only the model can judge, so the
+loop has to take its word: it stops when the model stops talking. "Every
+test passes" is a goal code can check, so the loop stops when it's true,
+whatever the model thinks. Same loop, same model; the only difference is
+who holds the stop button.
 
-**You build:** `goal.py` with two goals, and `loop.py` taking `--goal`.
+## In the code
+| Piece | Where |
+|---|---|
+| The goal interface | [harness/goal.py](../harness/goal.py) `Goal.is_met() -> True / False / None` |
+| `PytestGoal` | `run_tests().exit_code == 0`: verified |
+| `SelfAssessedGoal` | always `None`: code can't check it |
+| The verdicts | [harness/loop.py](../harness/loop.py): `DONE` vs `ACCEPTED ON THE MODEL'S WORD` vs `STOPPED EARLY` |
+| The observer | the last lines of every run: tests after, the same for every goal |
 
-## The two goals
-| | `SelfAssessedGoal` | `PytestGoal` |
-|---|---|---|
-| Words the model sees | "Make the checkout service better." | "Every test in tests/ passes." |
-| `is_met()` returns | `None`: code cannot judge "better" | `True` / `False` from `run_tests()` |
-| Who ends the loop | the model, by stopping | your code |
+## Run it
+```
+python -m harness.scenario apply broken
+python -m harness.loop --fresh --goal self --no-check --no-gate --no-compact | tee runs/stage2-self.md
+python -m harness.scenario apply broken
+python -m harness.loop --fresh --goal pytest --no-check --no-gate --no-compact | tee runs/stage2-pytest.md
+```
 
-`is_met()` returning `None` is the video's "be happier" resolution in code:
-the loop can only wait for the model to stop and take its word for it.
+## What to look for
+- How each run ends: `ACCEPTED ON THE MODEL'S WORD` or `DONE: goal verified`.
+- The `observer:` line. It's the only thing that tells you whether the
+  self-assessed run was actually right.
+- Total tokens: who stopped first?
 
-## Steps
-1. Write `goal.py`: a `Goal` protocol (`name`, `description`, `is_met()`), the
-   two goals, and a `GOALS` dict keyed by name.
-2. In `loop.py`, turn `TASK` into a template with a `{goal}` slot, so only the
-   goal sentence differs between runs. Hold everything else constant.
-3. Replace the hard-coded `run_tests()` checks with `goal.is_met()`, and handle
-   all three answers: `True` stop, `False` continue, `None` wait for the model.
-4. After the loop, always run the tests once more as an **outside observer**,
-   so both runs are measured the same way.
-5. Write down two predictions before running: will the vague goal fix the 4
-   bugs? Will it stop sooner or later, and change more?
-6. Run both, each from the broken baseline:
-   ```
-   git restore --source=broken -- checkout/ && venv/bin/python loop.py --goal self | tee runs/stage2-self.md && git diff broken -- checkout/ > runs/stage2-self.diff
-   git restore --source=broken -- checkout/ && venv/bin/python loop.py --goal pytest | tee runs/stage2-pytest.md && git diff broken -- checkout/ > runs/stage2-pytest.diff
-   ```
+## What happened when we ran it
+[results/stage2/comparison.md](../results/stage2/comparison.md): both runs
+fixed all 4 bugs, because the system prompt carried the real goal ("behave
+the way the tests describe"). But the self-assessed run used **62% more
+input tokens**, and its verdict would have printed exactly the same if the
+tests had still been failing.
 
-## Save to `outputs/stage2/`
-`run_self.md`, `run_pytest.md`, `diff_self.patch`, `diff_pytest.patch`,
-`tokens.csv`, `comparison.md` (the side-by-side table), and your `notes.md`.
-
-## Questions for your notes
-1. Were your predictions right? If the vague goal still fixed the bugs, what
-   in the model's context was really steering it?
-2. From inside the loop, could you tell run A's success from a failure? What
-   told you it succeeded?
-3. Where did the extra tokens in the self-assessed run go?
-
-## Optional: stage 2b
-Remove the oracle from the system prompt too (no mention of tests) and rerun
-`--goal self`. This is where a self-assessed loop should visibly drift.
-
-**Our result:** see [outputs/stage2/comparison.md](../outputs/stage2/comparison.md).
+## Try this
+1. **Remove the hidden oracle.** Delete "behave the way the tests describe"
+   and "run tests" from `SYSTEM_PROMPT` and rerun `--goal self`. Does "make it
+   better" still mean "fix the 4 bugs"? Check the observer line.
+2. **A goal with no oracle.** Add a `ReadableGoal` to `goal.py` whose
+   description is "Make the code easier to read" and whose `is_met` returns
+   `None`. What does the loop accept? What would you need to make it
+   checkable?
+3. **Keep the summary.** The pytest run stops before the model explains its
+   changes. Add one extra call after `DONE` that asks for a summary only. (The
+   stage 7 gate is a stricter version of this.)

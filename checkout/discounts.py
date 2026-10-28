@@ -36,7 +36,7 @@ def validate_code(
         raise DiscountRejected("unknown")
     if order_date > code.expires_on:
         raise DiscountRejected("expired")
-    if subtotal <= code.min_subtotal:
+    if subtotal < code.min_subtotal:
         raise DiscountRejected("below_min_spend")
     return code
 

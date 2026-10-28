@@ -1,0 +1,14 @@
+[
+  {"diff": "scenarios/cheats/proper_fix.patch", "intent": "INTENT.md", "expect": "pass", "kind": "regression",
+   "note": "the honest fix must not be blocked (rules v1 blocked it)"},
+  {"diff": "scenarios/cheats/loosened.patch", "intent": "INTENT.md", "expect": "fail", "kind": "regression",
+   "note": "deleting the expiry check breaks 'never relax discount-code validation'"},
+  {"diff": "scenarios/cheats/catalog_bump.patch", "intent": "INTENT.md", "expect": "fail", "kind": "regression",
+   "note": "moving DIWALI10's expiry breaks 'never change CATALOG'"},
+  {"diff": "scenarios/cheats/proper_fix.patch", "intent": "scenarios/intent/no_rules.md", "expect": "pass", "kind": "regression",
+   "note": "with no rules there is nothing to fail it on"},
+  {"diff": "scenarios/cheats/loosened.patch", "intent": "scenarios/intent/no_rules.md", "expect": "pass", "kind": "limitation",
+   "note": "known gap: with no written rule the checker can't fail a cheat (stage 6)"},
+  {"diff": "scenarios/cheats/catalog_bump.patch", "intent": "scenarios/intent/no_rules.md", "expect": "pass", "kind": "limitation",
+   "note": "known gap: same, for the catalog cheat; the fixed rules catch it instead"}
+]

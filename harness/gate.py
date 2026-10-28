@@ -6,12 +6,16 @@ one hunk at a time and asks for a one-sentence explanation of each. A hunk
 the human can't explain isn't accepted; "reject: <why>" sends it back to the
 actor, the same way a checker failure does.
 
-Explanations go to outputs/stage7/fixes.md, keyed by a hash of the hunk's
+Explanations go to .harness/fixes.md, keyed by a hash of the hunk's
 changed lines. Change the code afterwards and the old explanation no longer
 matches: `gate.py --check` fails until someone explains the new hunk.
 
 The gate is generic: anything that becomes a list of GateItems can be gated.
 Stage 8 gates the reflector's proposals with it.
+
+    python -m harness.gate                 # explain the current change, block by block
+    python -m harness.gate --check         # exit 1 if any block lacks an explanation
+    python -m harness.gate --diff scenarios/cheats/loosened.patch --fixes runs/try.md
 """
 
 import argparse
@@ -23,12 +27,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
-from checker import BASELINE_REF, current_diff
+from harness.paths import STATE_DIR
+from harness.scenario import NoScenario, current, current_diff
 
-REPO_ROOT = Path(__file__).resolve().parent
-FIXES_PATH = REPO_ROOT / "outputs" / "stage7" / "fixes.md"
+FIXES_PATH = STATE_DIR / "fixes.md"
 MIN_WORDS = 6
 REJECT_PREFIX = "reject:"
+CONTEXT_LINES = 2  # unchanged lines shown around each block
 
 
 @dataclass(frozen=True)
@@ -98,8 +103,6 @@ def hunks(diff: str) -> List[GateItem]:
     return items
 
 
-CONTEXT_LINES = 2
-
 
 def _function_name(hunk_header: str) -> str:
     match = re.search(r"@@.*@@.*?\bdef (\w+)", hunk_header)
@@ -162,10 +165,16 @@ def ask_human(items: List[GateItem], read: Callable[[str], str] = input) -> Gate
     return GateResult(decisions)
 
 
-def record(result: GateResult, path: Path = FIXES_PATH, baseline: str = BASELINE_REF) -> None:
+def record(result: GateResult, path: Optional[Path] = None, baseline: str = "") -> None:
     """Append this gate session to the fixes file: the human's words, kept with the code they explain."""
+    path = path or FIXES_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    lines = [f"\n## {datetime.now().strftime('%Y-%m-%d %H:%M')} (baseline {baseline})"]
+    if not baseline:
+        try:
+            baseline = f"scenario {current()}"
+        except NoScenario:
+            baseline = "no scenario"
+    lines = [f"\n## {datetime.now().strftime('%Y-%m-%d %H:%M')} ({baseline})"]
     for decision in result.decisions:
         verb = "accepted" if decision.accepted else "rejected"
         lines.append(f"- {verb} `{decision.item_id}` {decision.title}: {decision.sentence}")
@@ -173,8 +182,9 @@ def record(result: GateResult, path: Path = FIXES_PATH, baseline: str = BASELINE
         fixes.write("\n".join(lines) + "\n")
 
 
-def recorded_explanations(path: Path = FIXES_PATH) -> Dict[str, str]:
+def recorded_explanations(path: Optional[Path] = None) -> Dict[str, str]:
     """item id -> the latest accepted explanation in the fixes file."""
+    path = path or FIXES_PATH
     if not path.exists():
         return {}
     explained: Dict[str, str] = {}
@@ -183,7 +193,7 @@ def recorded_explanations(path: Path = FIXES_PATH) -> Dict[str, str]:
     return explained
 
 
-def unexplained(items: List[GateItem], path: Path = FIXES_PATH) -> List[GateItem]:
+def unexplained(items: List[GateItem], path: Optional[Path] = None) -> List[GateItem]:
     """The items nobody has explained yet: new hunks, or hunks that changed since they were explained."""
     explained = recorded_explanations(path)
     return [item for item in items if item.id not in explained]
@@ -209,7 +219,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gate the current change on a human's explanations.")
     parser.add_argument("--check", action="store_true",
                         help="don't ask; exit 1 if any hunk lacks a recorded explanation")
-    parser.add_argument("--diff", type=Path, help=f"a patch file (default: git diff {BASELINE_REF} -- checkout/)")
+    parser.add_argument("--diff", type=Path, help="a patch file (default: the loop's change since the scenario was applied)")
     parser.add_argument("--fixes", type=Path, default=FIXES_PATH, help="where explanations are kept")
     args = parser.parse_args()
     items = hunks(args.diff.read_text() if args.diff else current_diff())

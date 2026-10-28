@@ -1,4 +1,4 @@
-"""Stage 1-4 loop flowcharts, matching loop.py at each stage's commit."""
+"""Stage 1-8 flowcharts: one layer of the harness per chart."""
 
 import sys
 
@@ -173,15 +173,19 @@ def left_to(a, b, label):
 
 n = nodes_from([
     ("pass", 0, 0, "A loop pass ran its tools\nand goal.is_met() is True", "term", "term", 330),
-    ("evidence", 0, 1, "Collect the evidence\ngit diff broken -- checkout/  +  INTENT.md", "box", "new", 360),
-    ("checker", 0, 2, "Checker (Haiku):\nallowed by INTENT.md?", "diamond", "new", 280),
-    ("done", 1, 2, "PASS → DONE\nchange accepted", "term", "done", 220),
-    ("down", -1, 2, "Checker unavailable\n→ NOT accepted\n(fail closed)", "term", "bad", 200),
-    ("reject", 0, 3, "FAIL → violations back to the actor\neach quotes the rule it breaks", "box", "new", 360),
-    ("next", 0, 4, "Next pass: the actor fixes again\n↻ goal check → checker again", "term", "model", 330),
+    ("rules", 0, 1, "Fixed rules (code, free):\nCATALOG and checks kept?", "diamond", "new", 330),
+    ("ruled", -1, 1, "FAIL → back to the actor\nno model call spent", "term", "bad", 210),
+    ("evidence", 0, 2, "Collect the evidence: the change since\nthe scenario was applied  +  INTENT.md", "box", "new", 360),
+    ("checker", 0, 3, "Checker (Haiku):\nallowed by INTENT.md?", "diamond", "new", 280),
+    ("done", 1, 3, "PASS → DONE\nchange accepted", "term", "done", 220),
+    ("down", -1, 3, "Checker unavailable\n→ NOT accepted\n(fail closed)", "term", "bad", 200),
+    ("reject", 0, 4, "FAIL → violations back to the actor\neach quotes the rule it breaks", "box", "new", 360),
+    ("next", 0, 5, "Next pass: the actor fixes again\n↻ goal check → rules → checker again", "term", "model", 340),
 ])
 e = [
-    edge([n["pass"].bottom(), n["evidence"].top()]),
+    edge([n["pass"].bottom(), n["rules"].top()]),
+    left_to(n["rules"], n["ruled"], "fail"),
+    yes_no_down(n["rules"], n["evidence"], "pass"),
     edge([n["evidence"].bottom(), n["checker"].top()]),
     right_to(n["checker"], n["done"], "pass"),
     left_to(n["checker"], n["down"], "error"),
@@ -192,10 +196,11 @@ res = ["Result: 3 diffs that all pass the 14 tests (1 honest fix, 2 cheats) × 2
        "Empty INTENT.md: all 3 PASS, cheats included (noticed, but no written rule to fail them on).",
        "Rules v1: both cheats FAIL, but the honest fix FAILS too: \"never relax validation\" was too vague.",
        "Rules v2 (+ \"min spend is inclusive\"): honest PASS, both cheats FAIL; one review misread a line.",
-       "Lesson: a checker only enforces written intent, as precisely as it's written, and is still just an agent."]
+       "Lesson: a checker only enforces written intent, as precisely as it's written, and is still just an agent.",
+       "Since then: fixed rules catch both cheats for free first; checker_eval.py tests the checker itself (pass^k)."]
 render(f"{OUT}/stage5_flow.svg", "Stage 5: the checker, a second model reviews the work",
        "Tests decide whether the code works; the checker decides whether the change is allowed.",
-       n, e, "new in this stage", res, height_for(5, len(res)))
+       n, e, "new in this stage", res, height_for(6, len(res)))
 print("stage5 ok")
 
 # ---------------------------------------------------------------- stage 6: the trap
@@ -226,3 +231,60 @@ render(f"{OUT}/stage6_flow.svg", "Stage 6: intent debt, the bug 4 trap",
        "Three fixes pass every test. Only written intent tells the honest one from the cheats.",
        n, e, "new in this stage", res, height_for(5, len(res)))
 print("stage6 ok")
+
+# ---------------------------------------------------------------- stage 7: the human gate
+n = nodes_from([
+    ("pass", 0, 0, "Tests pass and the checker\nsays PASS", "term", "term", 300),
+    ("split", 0, 1, "Split the change into blocks\nskip blocks already explained", "box", "new", 320),
+    ("human", 0, 2, "Human: explain each block\nin one sentence?", "diamond", "new", 280),
+    ("done", 1, 2, "All explained → DONE\nsaved to .harness/fixes.md", "term", "done", 230),
+    ("down", -1, 2, "No terminal\n→ NOT accepted\n(fail closed)", "term", "bad", 200),
+    ("reject", 0, 3, "reject: <why> → the reasons\ngo back to the actor", "box", "new", 320),
+    ("next", 0, 4, "Next pass: the actor reworks\n↻ tests → checker → gate (new blocks only)", "term", "model", 360),
+])
+e = [
+    edge([n["pass"].bottom(), n["split"].top()]),
+    edge([n["split"].bottom(), n["human"].top()]),
+    right_to(n["human"], n["done"], "explained"),
+    left_to(n["human"], n["down"], "no human"),
+    yes_no_down(n["human"], n["reject"], "reject"),
+    edge([n["reject"].bottom(), n["next"].top()]),
+]
+res = ["Design: cheapest check first. Tests take milliseconds, the checker cents, a human minutes.",
+       "Each explanation is keyed to a hash of the lines it explains: edit them and it goes stale (gate --check).",
+       "The loosened cheat: the honest blocks keep their explanations; only the block that deletes",
+       "the expiry check asks for a sentence, and an honest sentence has to admit the deletion.",
+       "Checked offline in selftest/ (fake model, scripted human)."]
+render(f"{OUT}/stage7_flow.svg", "Stage 7: the human gate",
+       "Tests say it works, the checker says it's allowed, the gate says someone understands it.",
+       n, e, "new in this stage", res, height_for(5, len(res)))
+print("stage7 ok")
+
+# ---------------------------------------------------------------- stage 8: the outer loop
+n = nodes_from([
+    ("before", 0, 0, "before: held-out bug sets 04-06\ncommitted INTENT.md, no lessons", "term", "term", 340),
+    ("train", 0, 1, "train: bug sets 01-03\nthe audit reports incidents", "box", "plain", 320),
+    ("reflect", 0, 2, "reflect.py propose (Opus)\nreads train-* only → rules + lessons", "box", "new", 360),
+    ("gate", 0, 3, "Human gate:\naccept with a sentence?", "diamond", "new", 280),
+    ("dropped", -1, 3, "reject: <why>\n→ never applied", "term", "bad", 200),
+    ("learned", 0, 4, "runs/stage8/learned/\nINTENT.md + LESSONS.md", "box", "new", 320),
+    ("after", 0, 5, "after: held-out 04-06 again\nretrain: 01-03 again (overfitting)", "box", "plain", 340),
+    ("compare", 0, 6, "summary: incidents before → after", "term", "done", 320),
+])
+e = [
+    edge([n["before"].bottom(), n["train"].top()]),
+    edge([n["train"].bottom(), n["reflect"].top()]),
+    edge([n["reflect"].bottom(), n["gate"].top()]),
+    left_to(n["gate"], n["dropped"], "reject"),
+    yes_no_down(n["gate"], n["learned"], "accept"),
+    edge([n["learned"].bottom(), n["after"].top()]),
+    edge([n["after"].bottom(), n["compare"].top()]),
+]
+res = ["Design: learn on 01-03, measure on unseen 04-06. The audit (scenarios/audit/) stands in for production.",
+       "Every bug set fails one visible test and has a shortcut the audit catches (checked in selftest/).",
+       "Held-out incidents fall → the lesson transfers. Only train incidents fall → memorisation.",
+       "The reflector never sees held-out runs or the audit's tests, and can't edit tests, tools or the goal."]
+render(f"{OUT}/stage8_flow.svg", "Stage 8: the outer loop, learning from past runs",
+       "The inner loop fixes code. The outer loop fixes the harness, and only through a human.",
+       n, e, "new in this stage", res, height_for(7, len(res)))
+print("stage8 ok")

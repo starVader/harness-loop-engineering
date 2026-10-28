@@ -9,7 +9,7 @@ is_met() returns:
 
 from typing import Dict, Optional, Protocol
 
-from tools import run_tests
+from harness.tools import run_tests
 
 
 class Goal(Protocol):

@@ -1,48 +1,52 @@
-# Stage 4: compaction, forgetting on purpose
+# Stage 4: context, forgetting on purpose
 
 ![Stage 4 flow](../assets/stage4_flow.png)
 
-**You learn:** every call re-sends the whole conversation, so cost grows with
-history. Compaction trades memory for size, and *when* you forget matters as
-much as *whether* you do.
+**The idea.** Every pass re-sends the whole conversation, so each call costs
+more than the last. Compaction throws the conversation away once a call gets
+too big and restarts it from the spine's briefing. It's forgetting on
+purpose. The question isn't whether it saves input tokens; it's whether it
+saves *money and passes*.
 
-**You build:** `compact_history()` in `loop.py`, one `if` after the spine is
-saved, and two flags: `--compact-at N` and `--no-compact`.
-
-## The mechanism
-Once the last call's `input_tokens` exceeds the limit, restart the
-conversation as one message: the task plus the spine's briefing. It's the same
-mechanism as stage 3's resume, done on purpose.
-
-## Three traps
-| Trap | Fix |
+## In the code
+| Piece | Where in [harness/loop.py](../harness/loop.py) |
 |---|---|
-| A resumed run's `task` already carries a briefing | keep a clean `base_task`; compact from that |
-| The briefing says "after an interruption" when nothing crashed | `progress_note(spine, reason=...)` tells the model the truth |
-| Compacting between a `tool_use` and its `tool_result` gets a 400 | compact only after the results are appended and the spine is saved |
+| The trigger | after each pass: `response.usage.input_tokens > compact_at` |
+| The restart | `compact_history`: one user message, the task plus `progress_note(spine)` |
+| What can't be forgotten | a checker or gate rejection is appended *after* compaction, so it survives |
+| The record | `PassRecord.compacted = True` on the pass that triggered it |
 
-A fourth isn't fixable cheaply: the size check sees the call that already
-happened, so it always reacts one call late.
+## Run it
+Three runs, only the limit changes:
+```
+python -m harness.scenario apply broken
+python -m harness.loop --fresh --no-compact --no-check --no-gate | tee runs/stage4-none.md
+python -m harness.scenario apply broken
+python -m harness.loop --fresh --compact-at 5000 --no-check --no-gate | tee runs/stage4-5000.md
+python -m harness.scenario apply broken
+python -m harness.loop --fresh --compact-at 2000 --no-check --no-gate | tee runs/stage4-2000.md
+grep -E "^tokens|COMPACTED|total tokens" runs/stage4-*.md
+```
 
-## Steps
-1. Add `compact_history(task, spine)`, the `base_task` split and the `reason`
-   parameter; record `compacted: True` on the pass in the spine.
-2. Stub-test it: compaction on, off, and loading an older `progress.json`
-   that has no `compacted` field.
-3. Predict, then run three times from the broken baseline:
-   ```
-   git restore --source=broken -- checkout/ && venv/bin/python loop.py --fresh | tee runs/stage4-compact.md
-   git restore --source=broken -- checkout/ && venv/bin/python loop.py --fresh --no-compact | tee runs/stage4-baseline.md
-   git restore --source=broken -- checkout/ && venv/bin/python loop.py --fresh --compact-at 2000 | tee runs/stage4-compact2000.md
-   ```
+## What to look for
+- When `COMPACTED` fires, and what the model does on the next pass.
+- Input *and* output totals. Output costs about 5× as much as input.
 
-## Save to `outputs/stage4/`
-The three runs, `diff_C.patch`, `progress_C_final.json`, `tokens.csv`,
-`comparison.md`, your `notes.md`.
+## What happened when we ran it
+[results/stage4/comparison.md](../results/stage4/comparison.md): compacting
+at 2,000 cut input by 6% but added 13% output and one extra pass, so it was
+the **most expensive** of the three runs. It fired right after the model had
+read 8 files, and the model's next move was to re-read them. At 5,000 it
+never fired: the only big call was the one that met the goal, and a size
+check can only shrink the *next* call.
 
-## Questions for your notes
-1. Why did the 5,000 limit never fire?
-2. Run C used fewer input tokens but cost more. Why?
-3. What would the briefing need to contain for the model to skip the re-read?
-
-**Our result:** see [outputs/stage4/comparison.md](../outputs/stage4/comparison.md).
+## Try this
+1. **Compact later.** Find the limit at which compaction fires *after* the
+   fixes are written, not just after the reads. Is that run cheaper than no
+   compaction?
+2. **A better briefing.** `progress_note` lists file names only. Add a
+   one-line summary of what each failing test checks, then rerun at 2,000.
+   Does the re-read go away?
+3. **Price it.** Write a 10-line script that reads a transcript's `tokens:`
+   lines and prints its cost at $2/M input and $10/M output. Measure
+   compaction in money, not in input tokens.

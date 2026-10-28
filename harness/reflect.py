@@ -1,11 +1,13 @@
 """The outer loop: read past runs, propose what to write down next.
 
-    venv/bin/python reflect.py propose   # one model call -> runs/stage8/proposals.{json,md}
-    venv/bin/python reflect.py gate      # you accept or reject each one; accepted ones are applied
+    python -m harness.reflect propose   # one model call -> runs/stage8/proposals.{json,md}
+    python -m harness.reflect gate      # you accept or reject each one; accepted ones are applied
 
-The inner loop fixes code. This loop fixes the *harness*: the rules in
-INTENT.md that the actor and checker read, and LESSONS.md, which the actor
-gets in its system prompt. It learns only from training runs: their
+The inner loop fixes code. This loop fixes the *harness*: the rules in the
+intent file that the actor and checker read, and the lessons the actor gets
+in its system prompt. What it learns is written to runs/stage8/learned/
+(INTENT.md and LESSONS.md), never over the committed INTENT.md, so the
+experiment can always be reset by deleting runs/stage8/. It learns only from training runs: their
 transcripts, diffs, and the audit's incident names. It never sees the audit's
 tests, the bug sets, or a held-out run, and it never applies anything itself:
 every proposal goes through the human gate.
@@ -15,20 +17,16 @@ import argparse
 import hashlib
 import json
 import sys
-from pathlib import Path
 from typing import List
 
 import anthropic
 
-from gate import GateItem, GateUnavailable, ask_human, print_result, record
+from harness.gate import GateItem, GateUnavailable, ask_human, print_result, record
+from harness.paths import DEFAULT_INTENT, LEARNED_DIR, LEARNED_INTENT, LEARNED_LESSONS, REPO_ROOT, STAGE8_DIR
 
-REPO_ROOT = Path(__file__).resolve().parent
-RUNS_DIR = REPO_ROOT / "runs" / "stage8"
-INTENT_PATH = REPO_ROOT / "INTENT.md"
-LESSONS_PATH = REPO_ROOT / "LESSONS.md"
-PROPOSALS_JSON = RUNS_DIR / "proposals.json"
-PROPOSALS_MD = RUNS_DIR / "proposals.md"
-DECISIONS_PATH = RUNS_DIR / "decisions.md"
+PROPOSALS_JSON = STAGE8_DIR / "proposals.json"
+PROPOSALS_MD = STAGE8_DIR / "proposals.md"
+DECISIONS_PATH = STAGE8_DIR / "decisions.md"
 TRAIN_PREFIX = "train-"  # the only runs the reflector may read
 REFLECT_MODEL = "claude-opus-5-5"
 REFLECT_MAX_TOKENS = 16000
@@ -56,6 +54,10 @@ proposals to ten weak ones. Say why each one would also help on bugs you
 haven't seen.
 """
 
+class ReflectError(Exception):
+    """The outer loop can't take this step (no evidence, no proposals, no human). Nothing is applied."""
+
+
 PROPOSALS_SCHEMA = {
     "type": "object",
     "properties": {
@@ -82,14 +84,14 @@ PROPOSALS_SCHEMA = {
 
 def training_evidence() -> str:
     """Every training run's transcript, accepted diff and audit report, in one block per run."""
-    runs = sorted(path.stem for path in RUNS_DIR.glob(f"{TRAIN_PREFIX}*.md"))
+    runs = sorted(path.stem for path in STAGE8_DIR.glob(f"{TRAIN_PREFIX}*.md"))
     if not runs:
-        sys.exit(f"no training runs in {RUNS_DIR}; run `stage8/run.py train` first")
+        raise ReflectError(f"no training runs in {STAGE8_DIR}; run `python -m harness.experiment train` first")
     blocks = []
     for run in runs:
         parts = [f'<run name="{run}">']
         for suffix, tag in ((".md", "transcript"), (".diff", "accepted_diff"), (".audit", "audit")):
-            path = RUNS_DIR / f"{run}{suffix}"
+            path = STAGE8_DIR / f"{run}{suffix}"
             if path.exists():
                 parts.append(f"<{tag}>\n{path.read_text()}\n</{tag}>")
         parts.append("</run>")
@@ -99,9 +101,11 @@ def training_evidence() -> str:
 
 
 def propose() -> None:
-    lessons = LESSONS_PATH.read_text() if LESSONS_PATH.exists() else "(none yet)"
+    STAGE8_DIR.mkdir(parents=True, exist_ok=True)
+    intent = (LEARNED_INTENT if LEARNED_INTENT.exists() else DEFAULT_INTENT).read_text()
+    lessons = LEARNED_LESSONS.read_text() if LEARNED_LESSONS.exists() else "(none yet)"
     content = (
-        f"<intent_md>\n{INTENT_PATH.read_text()}\n</intent_md>\n\n"
+        f"<intent_md>\n{intent}\n</intent_md>\n\n"
         f"<lessons_md>\n{lessons}\n</lessons_md>\n\n"
         f"{training_evidence()}"
     )
@@ -116,17 +120,17 @@ def propose() -> None:
         messages=[{"role": "user", "content": content}],
     )
     if response.stop_reason != "end_turn":
-        sys.exit(f"reflect: stopped with stop_reason={response.stop_reason}; no proposals written")
+        raise ReflectError(f"stopped with stop_reason={response.stop_reason}; no proposals written")
     text = next((block.text for block in response.content if block.type == "text"), None)
     if text is None:
-        sys.exit("reflect: the model returned no text block")
+        raise ReflectError("the model returned no text block; no proposals written")
     raw = json.loads(text)
     PROPOSALS_JSON.write_text(json.dumps(raw, indent=2))
     PROPOSALS_MD.write_text(proposals_markdown(raw))
     print(f"reflect: {len(raw['proposals'])} proposal(s) -> {PROPOSALS_MD.relative_to(REPO_ROOT)} "
           f"(tokens in={response.usage.input_tokens} out={response.usage.output_tokens})")
     print(f"  summary  {raw['summary']}")
-    print("Next: venv/bin/python reflect.py gate")
+    print("Next: python -m harness.reflect gate")
 
 
 def proposals_markdown(raw: dict) -> str:
@@ -154,30 +158,33 @@ def gate_items(raw: dict) -> List[GateItem]:
 
 
 def apply_accepted(raw: dict, accepted_ids: List[str]) -> None:
-    """Append accepted rules to INTENT.md's Rules section (the last one) and lessons to LESSONS.md."""
+    """Append accepted rules to the learned INTENT.md's Rules section (the last one), lessons to LESSONS.md."""
     by_id = {item.id: proposal for item, proposal in zip(gate_items(raw), raw["proposals"])}
     rules = [by_id[item_id]["text"] for item_id in accepted_ids if item_id.startswith("intent_rule#")]
     lessons = [by_id[item_id]["text"] for item_id in accepted_ids if item_id.startswith("lesson#")]
+    LEARNED_DIR.mkdir(parents=True, exist_ok=True)
+    if not LEARNED_INTENT.exists():
+        LEARNED_INTENT.write_text(DEFAULT_INTENT.read_text())
     if rules:
-        intent = INTENT_PATH.read_text().rstrip("\n")
-        INTENT_PATH.write_text(intent + "\n" + "\n".join(f"- {rule}" for rule in rules) + "\n")
-        print(f"applied: {len(rules)} rule(s) added to INTENT.md")
+        intent = LEARNED_INTENT.read_text().rstrip("\n")
+        LEARNED_INTENT.write_text(intent + "\n" + "\n".join(f"- {rule}" for rule in rules) + "\n")
+        print(f"applied: {len(rules)} rule(s) added to {LEARNED_INTENT.relative_to(REPO_ROOT)}")
     if lessons:
-        existing = LESSONS_PATH.read_text().rstrip("\n") if LESSONS_PATH.exists() else "# Lessons from past runs"
-        LESSONS_PATH.write_text(existing + "\n" + "\n".join(f"- {lesson}" for lesson in lessons) + "\n")
-        print(f"applied: {len(lessons)} lesson(s) added to LESSONS.md")
+        existing = LEARNED_LESSONS.read_text().rstrip("\n") if LEARNED_LESSONS.exists() else "# Lessons from past runs"
+        LEARNED_LESSONS.write_text(existing + "\n" + "\n".join(f"- {lesson}" for lesson in lessons) + "\n")
+        print(f"applied: {len(lessons)} lesson(s) added to {LEARNED_LESSONS.relative_to(REPO_ROOT)}")
 
 
 def gate() -> None:
     if not PROPOSALS_JSON.exists():
-        sys.exit("no proposals yet; run `reflect.py propose` first")
+        raise ReflectError("no proposals yet; run `python -m harness.reflect propose` first")
     raw = json.loads(PROPOSALS_JSON.read_text())
     print("For each proposal: one sentence on why you accept it, or 'reject: <why>'.")
     print("Reject anything that names code, or that only fixes the bugs it saw.")
     try:
         result = ask_human(gate_items(raw))
     except GateUnavailable as exc:
-        sys.exit(f"GATE UNAVAILABLE: {exc}; nothing applied")
+        raise ReflectError(f"gate unavailable ({exc}); nothing applied") from exc
     record(result, DECISIONS_PATH, baseline="training runs")
     print_result(result)
     apply_accepted(raw, [decision.item_id for decision in result.decisions if decision.accepted])
@@ -187,4 +194,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="The outer loop: learn from training runs, through a human gate.")
     parser.add_argument("step", choices=["propose", "gate"])
     args = parser.parse_args()
-    propose() if args.step == "propose" else gate()
+    try:
+        if args.step == "propose":
+            propose()
+        else:
+            gate()
+    except ReflectError as exc:
+        sys.exit(f"reflect: {exc}")

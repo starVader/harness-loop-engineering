@@ -11,17 +11,15 @@ a typed verdict via structured outputs.
 
 import argparse
 import json
-import os
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
 import anthropic
 
-REPO_ROOT = Path(__file__).resolve().parent
-INTENT_PATH = REPO_ROOT / "INTENT.md"
-BASELINE_REF = os.environ.get("LOOP_BASELINE", "broken")  # stage 8 sets it to a bugset-NN tag
+from harness.paths import intent_path
+from harness.scenario import current_diff
+
 CHECKER_MODEL = "claude-haiku-5-5"
 CHECKER_MAX_TOKENS = 8000
 
@@ -81,15 +79,6 @@ class CheckerUnavailable(Exception):
     """The checker could not give a verdict. The change must not be accepted."""
 
 
-def current_diff() -> str:
-    """What the loop changed: checkout/ against the broken baseline."""
-    completed = subprocess.run(
-        ["git", "diff", BASELINE_REF, "--", "checkout/"],
-        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
-    )
-    return completed.stdout
-
-
 def review_diff(client: anthropic.Anthropic, diff: str, intent: str) -> Verdict:
     """Ask the checker model for a verdict. Raises CheckerUnavailable on any failure."""
     if not diff.strip():
@@ -146,9 +135,10 @@ def print_verdict(verdict: Verdict) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Review a diff against an intent file.")
-    parser.add_argument("--diff", type=Path, help="a patch file (default: git diff broken -- checkout/)")
-    parser.add_argument("--intent", type=Path, default=INTENT_PATH, help="the intent file (default: INTENT.md)")
+    parser.add_argument("--diff", type=Path, help="a patch file (default: the loop's change since the scenario was applied)")
+    parser.add_argument("--intent", type=Path, default=None, help="the intent file (default: INTENT.md)")
     args = parser.parse_args()
+    args.intent = args.intent or intent_path()
     diff_text = args.diff.read_text() if args.diff else current_diff()
     print(f"=== checker: diff={args.diff or 'working tree'} intent={args.intent}")
     print_verdict(review_diff(anthropic.Anthropic(), diff_text, args.intent.read_text()))

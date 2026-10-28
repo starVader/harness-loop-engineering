@@ -222,6 +222,10 @@ __marimo__/
 # Loop engineering lab
 # Loop state is never committed. Reset code with `git restore --source=broken -- checkout/`; never `git clean`.
 progress.*
-runs/
+runs/*
+!runs/.gitkeep
 .idea/
 .DS_Store
+
+# harness run state (spine, scenario baseline, gate explanations)
+.harness/
