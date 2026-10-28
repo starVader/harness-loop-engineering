@@ -1,9 +1,13 @@
 import argparse
+from dataclasses import dataclass
+from pathlib import Path
 from typing import List, Optional
 
 from anthropic.types import Message, ToolResultBlockParam, messages, MessageParam
 
 from checker import CheckerUnavailable, INTENT_PATH, current_diff, feedback_for_actor, print_verdict, review_diff
+from gate import GateUnavailable, ask_human, hunks, record, unexplained
+from gate import feedback_for_actor as gate_feedback_for_actor, print_result as print_gate_result
 from goal import GOALS, Goal
 from spine import (
     STATUS_DONE,
@@ -25,6 +29,7 @@ ACTOR_MODELS = {"sonnet": "claude-sonnet-5-5", "haiku": "claude-haiku-5-5"}
 MAX_TOKENS = 16000
 MAX_PASSES = 8
 COMPACT_AT_INPUT_TOKENS = 5_000  # low on purpose: these runs peak around 8K
+LESSONS_PATH = Path(__file__).resolve().parent / "LESSONS.md"  # stage 8: what the outer loop learned
 
 SYSTEM_PROMPT = """
     This system is a checkout service. It is at the heart of ordering system where real money is involved in customer checkouts. 
@@ -69,11 +74,19 @@ def run_tool_calls(response: Message) -> List[ToolResultBlockParam]:
         })
     return tool_results
 
-def call_model(client: anthropic.Anthropic, messages: List[MessageParam], model: str) -> Message:
+def system_prompt(lessons_path: Path) -> str:
+    """The actor's standing instructions, plus any lessons a human accepted from the outer loop."""
+    if not lessons_path.exists():
+        return SYSTEM_PROMPT
+    lessons = lessons_path.read_text().strip()
+    print(f"lessons: {len(lessons.splitlines())} line(s) from {lessons_path.name} added to the system prompt")
+    return f"{SYSTEM_PROMPT}\n<lessons from past runs>\n{lessons}\n</lessons from past runs>"
+
+def call_model(client: anthropic.Anthropic, messages: List[MessageParam], model: str, system: str) -> Message:
     return client.messages.create(
         model=model,
         max_tokens=MAX_TOKENS,
-        system=SYSTEM_PROMPT,
+        system=system,
         tools=TOOLS,
         messages=messages,
     )
@@ -91,6 +104,46 @@ def checker_feedback(client: anthropic.Anthropic, check: bool) -> Optional[str]:
     verdict = review_diff(client, current_diff(), INTENT_PATH.read_text())
     print_verdict(verdict)
     return None if verdict.passed else feedback_for_actor(verdict)
+
+def gate_feedback(gate_on: bool) -> Optional[str]:
+    """Ask the human to explain each block nobody has explained yet. None = accepted; a string = the rejection."""
+    if not gate_on:
+        print("gate: off (--no-gate)")
+        return None
+    pending = unexplained(hunks(current_diff()))
+    if not pending:
+        print("gate: PASS (every block is already explained)")
+        return None
+    result = ask_human(pending)
+    record(result)
+    print_gate_result(result)
+    return None if result.passed else gate_feedback_for_actor(result)
+
+@dataclass(frozen=True)
+class Review:
+    rejection: Optional[str]  # None = accepted
+    rejected_by: str  # "CHECKER" or "GATE" when rejected
+    checker: Optional[str]  # "pass" / "fail", None when off or not reached
+    gate: Optional[str]
+
+def review_change(client: anthropic.Anthropic, check: bool, gate_on: bool) -> Review:
+    """The tests passed. Checker first, then the human: never spend a human on a change the checker rejects.
+
+    Raises CheckerUnavailable or GateUnavailable: either one means the change is not accepted.
+    """
+    rejection = checker_feedback(client, check)
+    checker = None if not check else ("pass" if rejection is None else "fail")
+    if rejection is not None:
+        return Review(rejection, "CHECKER", checker, gate=None)
+    rejection = gate_feedback(gate_on)
+    gate = None if not gate_on else ("pass" if rejection is None else "fail")
+    return Review(rejection, "GATE" if rejection is not None else "", checker, gate)
+
+def print_rejection(review: Review) -> None:
+    if review.rejected_by == "CHECKER":
+        print("CHECKER REJECTED: the goal is met but the change breaks INTENT.md; sending the violations back")
+    else:
+        print("GATE REJECTED: the goal is met but the human did not accept part of the change; sending their reasons back")
 
 def open_spine(goal: Goal, fresh: bool) -> Optional[Spine]:
     """Decide whether to resume. Returns None when the run must not start at all."""
@@ -114,12 +167,13 @@ def open_spine(goal: Goal, fresh: bool) -> Optional[Spine]:
 
 
 def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optional[int], check: bool,
-         actor_model: str) -> None:
+         actor_model: str, gate_on: bool, lessons_path: Path) -> None:
     spine = open_spine(goal, fresh)
     if spine is None:
         return
 
     client = anthropic.Anthropic()
+    system = system_prompt(lessons_path)
     # base_task never carries a briefing, so compaction can't stack an old one under a new one
     base_task = TASK_TEMPLATE.format(goal=goal.description)
     task = base_task
@@ -134,7 +188,7 @@ def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optiona
 
     for pass_number in range(first_pass, MAX_PASSES + 1):
         # Act: the model decides what to do next
-        response = call_model(client, messages, actor_model)
+        response = call_model(client, messages, actor_model, system)
         total_input += response.usage.input_tokens
         total_output += response.usage.output_tokens
         print(f"--- pass {pass_number}/{MAX_PASSES}")
@@ -150,15 +204,15 @@ def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optiona
                 print(f"STOPPED EARLY: stop_reason={response.stop_reason} but the goal is not met")
             else:
                 try:
-                    feedback = checker_feedback(client, check)
-                except CheckerUnavailable as exc:
-                    print(f"CHECKER UNAVAILABLE: {exc}; not accepting the change")
+                    review = review_change(client, check, gate_on)
+                except (CheckerUnavailable, GateUnavailable) as exc:
+                    print(f"REVIEW UNAVAILABLE: {exc}; not accepting the change")
                     spine.status = STATUS_STOPPED
                     save_spine(spine)
                     break
-                if feedback is not None:
-                    print("CHECKER REJECTED: the goal is met but the change breaks INTENT.md; sending the violations back")
-                    messages.append({"role": "user", "content": feedback})
+                if review.rejection is not None:
+                    print_rejection(review)
+                    messages.append({"role": "user", "content": review.rejection})
                     continue
                 print("DONE: model stopped, the goal is verified and the change is accepted")
             spine.status = STATUS_DONE if verdict else STATUS_STOPPED
@@ -192,21 +246,23 @@ def main(goal: Goal, fresh: bool, stop_after: Optional[int], compact_at: Optiona
         if verdict is None:
             print("  goal      cannot be checked by code; waiting for the model to stop")
         elif verdict:
-            # Checker: the tests say it works; the checker says whether it is allowed
+            # Checker, then gate: the tests say it works; the checker says it is allowed; the human says it is understood
             try:
-                rejection = checker_feedback(client, check)
-            except CheckerUnavailable as exc:
-                print(f"CHECKER UNAVAILABLE: {exc}; not accepting the change")
+                review = review_change(client, check, gate_on)
+            except (CheckerUnavailable, GateUnavailable) as exc:
+                print(f"REVIEW UNAVAILABLE: {exc}; not accepting the change")
                 spine.status = STATUS_STOPPED
                 save_spine(spine)
                 break
-            spine.passes[-1].checker = None if not check else ("pass" if rejection is None else "fail")
+            spine.passes[-1].checker = review.checker
+            spine.passes[-1].gate = review.gate
+            rejection = review.rejection
             if rejection is None:
                 print(f"DONE: goal verified on pass {pass_number} and the change is accepted")
                 spine.status = STATUS_DONE
                 save_spine(spine)
                 break
-            print("CHECKER REJECTED: the goal is met but the change breaks INTENT.md; sending the violations back")
+            print_rejection(review)
         else:
             print("  goal      not met yet")
         save_spine(spine)
@@ -247,6 +303,9 @@ if __name__ == "__main__":
                         help=f"compact once a call's input tokens exceed this (default {COMPACT_AT_INPUT_TOKENS})")
     parser.add_argument("--no-check", action="store_true", help="skip the checker (accept on tests alone)")
     parser.add_argument("--actor-model", choices=sorted(ACTOR_MODELS), default="sonnet", help="model that writes the fixes")
+    parser.add_argument("--no-gate", action="store_true", help="skip the human gate (unattended runs only)")
+    parser.add_argument("--lessons", type=Path, default=LESSONS_PATH,
+                        help=f"lessons appended to the actor's system prompt if the file exists (default {LESSONS_PATH.name})")
     args = parser.parse_args()
     if args.compact_at <= 0:
         parser.error("--compact-at must be a positive number of tokens; use --no-compact to turn compaction off")
@@ -257,4 +316,6 @@ if __name__ == "__main__":
         compact_at=None if args.no_compact else args.compact_at,
         check=not args.no_check,
         actor_model=ACTOR_MODELS[args.actor_model],
+        gate_on=not args.no_gate,
+        lessons_path=args.lessons,
     )

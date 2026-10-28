@@ -36,6 +36,7 @@ class PassRecord:
     output_tokens: int
     compacted: bool = False  # the conversation was restarted from the spine after this pass
     checker: Optional[str] = None  # "pass" / "fail" when the checker reviewed this pass
+    gate: Optional[str] = None  # "pass" / "fail" when a human reviewed this pass
 
 
 @dataclass

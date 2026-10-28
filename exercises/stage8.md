@@ -35,58 +35,53 @@ the way an accounts reconciliation does weeks later.
 The two splits share kinds of mistake, not the same mistake. A lesson that
 transfers is a real one; a lesson that only fixes 01-03 is memorisation.
 
-## What you write
-1. **`reflect.py`**: the outer loop's one step. It reads the training runs
-   (transcripts, `progress.json` copies, checker summaries, audit incidents)
-   plus the current `INTENT.md` and `LESSONS.md`, makes one model call, and
-   writes `runs/stage8/proposals.md`. Each proposal is one of:
-   - an **intent rule** for `INTENT.md`: a business rule, in business words
-   - a **lesson** for `LESSONS.md`: advice on *how* to work ("check what a
-     function's docstring promises before changing its callers")
+## The outer loop (written)
+| File | What it does |
+|---|---|
+| `reflect.py propose` | one call to Opus. It reads only `runs/stage8/train-*` (transcripts, accepted diffs, audit incidents) plus `INTENT.md` and `LESSONS.md`, and writes `runs/stage8/proposals.md`. Each proposal is an **intent rule** (a business rule, in business words) or a **lesson** (how to work), with its evidence and why it should transfer |
+| `reflect.py gate` | the stage 7 gate applied to proposals: one sentence to accept each one, or `reject: <why>`. Decisions go to `runs/stage8/decisions.md`; accepted rules are appended to `INTENT.md`, lessons to `LESSONS.md` |
+| `loop.py --lessons` | appends `LESSONS.md` to the actor's system prompt, if the file exists. The actor can't open it with a tool |
+| `stage8/run.py PHASE` | runs every bug set in a phase and saves `<phase>-<NN>.md/.diff/.audit/.progress.json`; `summary` tabulates them |
 
-   Each proposal cites its evidence: which run, which incident or "not
-   covered" note. Use structured outputs, as `checker.py` does.
-2. **A change to `loop.py`**: if `LESSONS.md` exists, append it to the actor's
-   system prompt. The actor still can't open it with a tool, the same as the
-   audit.
+**The reflector's limits.** It proposes; it never applies. Only `reflect.py
+gate`, with your sentence, changes `INTENT.md` or `LESSONS.md`. It can't
+touch tests, `tools.py`, `goal.py` or the audit: a learner that can edit its
+own oracle learns to grade itself (stage 2, one level up).
 
-**The reflector's limits.** It proposes changes; it never applies them. It
-may propose changes to `INTENT.md` and `LESSONS.md` only, never to tests,
-`tools.py`, `goal.py` or the audit. A learner that can edit its own oracle
-learns to grade itself (stage 2, one level up).
+**Why the gate is off for the loop runs.** `run.py` passes `--no-gate`. If
+you explained every fix, you would catch the bugs yourself, and the
+experiment would measure you, not what the harness learned. Here the human
+gate guards what gets *learned*, not what gets merged.
 
 ## Steps
-Use the Haiku actor throughout (`--actor-model haiku`): stage 6 showed Sonnet
-rarely takes a shortcut, which leaves nothing to learn. One run, for bug set
-NN and phase P (`before`, `train` or `after`):
-```
-venv/bin/python stage8/bugset.py NN && LOOP_BASELINE=bugset-NN venv/bin/python loop.py --fresh --actor-model haiku | tee runs/stage8/P-NN.md && cp progress.json runs/stage8/P-NN.progress.json && git diff bugset-NN -- checkout/ > runs/stage8/P-NN.diff && venv/bin/python stage8/audit.py | tee runs/stage8/P-NN.audit
-```
+The actor is Haiku throughout: stage 6 showed Sonnet rarely takes a shortcut,
+which leaves nothing to learn. `run.py` refuses a `before` or `train` phase
+once `INTENT.md` or `LESSONS.md` has changed, so the order can't be mixed up.
 
-0. **Freeze the start.** `mkdir -p runs/stage8`, then copy `INTENT.md` to `runs/stage8/intent_before.md`.
-   `LESSONS.md` must not exist yet.
-1. **Before: held-out baseline.** Run 04, 05 and 06 (phase `before`). This
-   is what the harness does with no learning. Don't show these results to
-   the reflector.
-2. **Train.** Run 01, 02 and 03 (phase `train`). Count the audit incidents:
-   these are the "complaints" the outer loop gets to learn from.
-3. **Reflect.** `venv/bin/python reflect.py`, which reads only
-   `runs/stage8/train-*` and writes `runs/stage8/proposals.md`.
-4. **Gate.** For each proposal, accept or reject it with one sentence in
-   `runs/stage8/decisions.md`, then copy accepted rules into `INTENT.md` and
-   lessons into `LESSONS.md`. If you built `gate.py` in stage 7, use it here.
-   Reject any proposal that names a line, a variable or a bug set: an
-   accountant wouldn't understand it, and it won't transfer.
-5. **After: held-out again.** Run 04, 05 and 06 again (phase `after`), with
-   the learned `INTENT.md` and `LESSONS.md`.
-6. **Overfitting check.** Rerun 01-03 too (phase `retrain`). If the
-   train incidents fall but held-out ones don't, the outer loop memorised.
+1. **Before: held-out baseline.** `venv/bin/python stage8/run.py before`.
+   This also freezes `runs/stage8/intent_before.md`. It shows what the
+   harness does with no learning. The reflector never sees it.
+2. **Train.** `venv/bin/python stage8/run.py train`. The audit incidents are
+   the "complaints" the outer loop gets to learn from.
+3. **Reflect.** `venv/bin/python reflect.py propose`, then read
+   `runs/stage8/proposals.md`.
+4. **Gate.** `venv/bin/python reflect.py gate`. Reject any proposal that
+   names a file, a function or a bug set: an accountant wouldn't understand
+   it, and it won't transfer.
+5. **After: held-out again.** `venv/bin/python stage8/run.py after`.
+6. **Overfitting check.** `venv/bin/python stage8/run.py retrain`. If train
+   incidents fall and held-out ones don't, the outer loop memorised.
+7. **Compare.** `venv/bin/python stage8/run.py summary` writes
+   `runs/stage8/summary.md`.
 
-Runs vary: if your budget allows, do steps 1 and 5 twice and report both.
-Three held-out bug sets is a small sample, so report counts, not percentages.
+Runs vary: if your budget allows, run `before` and `after` twice (rename the
+first set of files) and report both. Three held-out bug sets is a small
+sample, so report counts, not percentages. The audit only means something
+for an `accepted` run; the summary shows each run's outcome next to its
+incidents.
 
 ## Possible outcomes
-| Held-out incidents, before → after | Train incidents, before → retrain | What it shows |
+| Held-out incidents, before → after | Train incidents, train → retrain | What it shows |
 |---|---|---|
 | fall | fall | learning that transfers: the rules were about the business, not the bugs |
 | flat | fall | memorisation: the lessons fit 01-03 and nothing else |
@@ -98,9 +93,10 @@ rule steered it), or take it and get `CHECKER REJECTED` (the rule was
 enforced)? That's the same steer-versus-guard question as stage 6.
 
 ## Save to `outputs/stage8/`
-`intent_before.md`, `INTENT.md` after, `LESSONS.md`, `proposals.md`,
-`decisions.md`, every run's `.md`, `.diff` and `.audit`, a `comparison.md`
-with incidents per bug set per phase, and your `notes.md`.
+Everything in `runs/stage8/` (`intent_before.md`, `proposals.md`,
+`decisions.md`, `summary.md`, every run's `.md`, `.diff` and `.audit`), the
+learned `INTENT.md` and `LESSONS.md`, a `comparison.md` in your words, and
+your `notes.md`.
 
 ## Questions for your notes
 1. Which accepted proposal did the most work, and on which held-out bug set?

@@ -8,6 +8,7 @@ The task family for the outer loop. See [exercises/stage8.md](../exercises/stage
 | `bugset.py NN` | builds tag `bugset-NN` (off to the side, `main` untouched) and restores `checkout/` from it |
 | `audit/` | business rules the visible tests miss: the stand-in for production |
 | `audit.py` | runs the audit; prints incident names only |
+| `run.py PHASE` | runs a phase (`before`, `train`, `after`, `retrain`) and saves each run; `summary` tabulates them |
 
 Like the stage 0 patch, the bug sets and the audit are spoilers. Don't read
 them until your stage 8 notes are written. The actor can't see this folder

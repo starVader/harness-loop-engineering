@@ -27,9 +27,9 @@ Reset the code between runs: `git restore --source=broken -- checkout/`. This pu
 | File | Author |
 |---|---|
 | `checkout/`, `tests/`, `tools.py`, `INTENT.md` | given (stage 0) |
-| `goal.py`, `loop.py`, `spine.py`, `reflect.py` | **you** |
+| `goal.py`, `loop.py`, `spine.py` | **you** (stages 1-6) |
 | `checker.py`, `gate.py` | given as references at stages 5 and 7 |
-| `stage8/` (bug sets, audit) | given at stage 8 |
+| `reflect.py`, `stage8/` (bug sets, audit, runner) | given at stage 8 |
 
 `tools.py` exposes `TOOLS` (Anthropic tool schemas) and `execute_tool(name, input) -> ToolOutcome`.
 The actor can write only `checkout/*.py`; `run_tests` has a fixed invocation. Use `tools.run_tests()` directly as your oracle.

@@ -20,7 +20,7 @@ One file per stage. Work through them in order; each one builds on the last.
 | 4 | Context: fresh vs growing, compaction | [stage4.md](stage4.md) |
 | 5 | A checker on a different model | [stage5.md](stage5.md) |
 | 6 | Intent debt: the trap in bug 4 | [stage6.md](stage6.md) |
-| 7 | The human gate | coming |
+| 7 | The human gate | [stage7.md](stage7.md) |
 | 8 | The outer loop: learning from past runs | [stage8.md](stage8.md) |
 | 9 | Triggers: schedule and hook | coming |
 
